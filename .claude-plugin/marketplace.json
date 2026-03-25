@@ -1,0 +1,21 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "quantiiv-marketplace",
+  "description": "Official Quantiiv plugins for Claude Code — analytics, pricing, and business intelligence tools",
+  "owner": {
+    "name": "Quantiiv",
+    "email": "support@quantiiv.com"
+  },
+  "plugins": [
+    {
+      "name": "quantiiv",
+      "description": "Query Quantiiv analytics data — sales, products, pricing, elasticity — directly from Claude Code using the @quantiiv-ai/sdk",
+      "category": "productivity",
+      "author": {
+        "name": "Quantiiv"
+      },
+      "source": "./plugins/quantiiv",
+      "homepage": "https://github.com/Northern-Star-Technologies/quantiiv-marketplace"
+    }
+  ]
+}

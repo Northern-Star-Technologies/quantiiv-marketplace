@@ -1,0 +1,12 @@
+{
+  "name": "quantiiv",
+  "version": "0.1.0",
+  "description": "Query Quantiiv analytics data — sales, products, pricing, elasticity — using the @quantiiv-ai/sdk",
+  "author": {
+    "name": "Quantiiv",
+    "url": "https://quantiiv.com"
+  },
+  "repository": "https://github.com/Northern-Star-Technologies/quantiiv-sdk",
+  "license": "MIT",
+  "keywords": ["quantiiv", "analytics", "restaurant", "retail", "sales", "pricing"]
+}
