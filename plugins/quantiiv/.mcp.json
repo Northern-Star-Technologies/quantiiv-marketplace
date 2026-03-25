@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "quantiiv": {
+      "type": "http",
+      "url": "https://quantiiv-api-400709292651.us-central1.run.app/mcp",
+      "headers": {
+        "Authorization": "Bearer ${QUANTIIV_API_KEY}"
+      }
+    }
+  }
+}
