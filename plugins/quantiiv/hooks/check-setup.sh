@@ -3,8 +3,8 @@ set -euo pipefail
 
 missing=()
 
-# Check SDK installation
-if ! node -e "require('@quantiiv-ai/sdk')" 2>/dev/null; then
+# Check SDK installation (resolve from global node_modules)
+if ! NODE_PATH="$(npm root -g)" node -e "require('@quantiiv-ai/sdk')" 2>/dev/null; then
   missing+=("SDK not installed globally (run /quantiiv:setup)")
 fi
 

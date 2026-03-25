@@ -46,10 +46,10 @@ curl -s -X POST https://quantiiv-api-400709292651.us-central1.run.app/sdk/regist
 npm install -g @quantiiv-ai/sdk
 ```
 
-3. **Verify the installation**:
+3. **Verify the installation** (use `NODE_PATH` to resolve global modules):
 
 ```bash
-node -e "const { QuantiivClient } = require('@quantiiv-ai/sdk'); console.log('SDK installed successfully');"
+NODE_PATH="$(npm root -g)" node -e "const { QuantiivClient } = require('@quantiiv-ai/sdk'); console.log('SDK installed successfully');"
 ```
 
 If the registry token fetch fails, check that the API key is valid and not expired.
@@ -59,7 +59,7 @@ If the registry token fetch fails, check that the API key is valid and not expir
 Since the env vars written to `settings.json` are not available until the next Claude Code session, pass the values directly in the verification script:
 
 ```bash
-QUANTIIV_API_KEY="<collected-key>" node -e '
+QUANTIIV_API_KEY="<collected-key>" NODE_PATH="$(npm root -g)" node -e '
 const { QuantiivClient } = require("@quantiiv-ai/sdk");
 const client = new QuantiivClient({
   token: process.env.QUANTIIV_API_KEY,

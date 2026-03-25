@@ -73,9 +73,9 @@ You have two ways to query data: **MCP tools** (direct tool calls) and the **SDK
 
 3. **For MCP queries** — Call the appropriate MCP tool directly with the required parameters.
 
-4. **For SDK queries** — Write and run a Node.js one-liner via Bash:
+4. **For SDK queries** — Write and run a Node.js one-liner via Bash. Always set `NODE_PATH` to resolve the globally installed SDK:
    ```bash
-   node -e '
+   NODE_PATH="$(npm root -g)" node -e '
    const { QuantiivClient } = require("@quantiiv-ai/sdk");
    const client = new QuantiivClient({ token: process.env.QUANTIIV_API_KEY });
    (async () => {

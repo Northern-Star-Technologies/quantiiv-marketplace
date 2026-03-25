@@ -9,20 +9,30 @@ argument-hint: <question about your business data>
 
 Query Quantiiv analytics data programmatically using the `@quantiiv-ai/sdk` npm package. Always use this SDK-based approach rather than raw API calls to keep response payloads out of context. Write and execute Node.js scripts that call SDK methods and extract only the fields needed to answer the question.
 
+## Global SDK Resolution
+
+The SDK is installed globally. Always set `NODE_PATH` to the global `node_modules` so Node.js finds it regardless of the current working directory:
+
+```bash
+export NODE_PATH="$(npm root -g)"
+```
+
+Prepend this to every `node -e` command, or run it once at the start of the session.
+
 ## Prerequisites
 
 Ensure the SDK is installed globally and environment variables are configured:
 
 ```bash
-# Check SDK availability
-node -e "require('@quantiiv-ai/sdk')" 2>/dev/null || echo "SDK not installed"
+# Check SDK availability from global install
+NODE_PATH="$(npm root -g)" node -e "require('@quantiiv-ai/sdk')" 2>/dev/null || echo "SDK not installed"
 ```
 
 If not installed, prompt the user to run `/quantiiv:setup` first.
 
 ## How to Query
 
-Write a Node.js script and execute it via Bash. Always include error handling:
+Write a Node.js script and execute it via Bash. Always include error handling and use `NODE_PATH`:
 
 ## Company Resolution
 
@@ -53,7 +63,7 @@ After fetching data, offer to visualize results:
 Wrap all SDK calls in try/catch:
 
 ```bash
-node -e '
+NODE_PATH="$(npm root -g)" node -e '
 const { QuantiivClient, QuantiivApiError } = require("@quantiiv-ai/sdk");
 const client = new QuantiivClient({
   token: process.env.QUANTIIV_API_KEY,
