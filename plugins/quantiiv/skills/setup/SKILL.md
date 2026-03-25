@@ -34,6 +34,8 @@ The SDK is hosted on a private GCS npm registry. Installation requires two steps
 1. **Fetch a temporary registry token** using the API key collected in Step 1:
 
 ```bash
+# Ensure ~/.npmrc ends with a newline before appending (prevents concatenation with existing last line)
+[ -f ~/.npmrc ] && [ -n "$(tail -c 1 ~/.npmrc)" ] && echo '' >> ~/.npmrc
 curl -s -X POST https://quantiiv-api-400709292651.us-central1.run.app/sdk/registry-token \
   -H "Authorization: Bearer <collected-key>" | jq -r '.npmrcSnippet' >> ~/.npmrc
 ```
