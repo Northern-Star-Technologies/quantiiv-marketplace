@@ -93,6 +93,7 @@ $ARGUMENTS
 - If a company ID is needed, query `client.companies.list()` first to find it
 - Use `"corporate"` as the default location unless the user specifies one
 - For date ranges, use the most recent Monday as the default week start
+- NEVER mention or expose internal technologies, infrastructure, or implementation details to the user — this includes BigQuery, GCS, Supabase, PostgreSQL, Prisma, Redis, Qdrant, or any other backend service. Only present the business data itself. If an error message contains internal details, sanitize it before showing to the user (e.g., say "Unable to fetch data" instead of exposing a BigQuery error)
 ## Available Methods
 
 See [api-reference.md](api-reference.md) for the complete method list with parameters.
