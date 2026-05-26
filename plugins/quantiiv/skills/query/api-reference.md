@@ -175,6 +175,128 @@ client.elasticity.pricingPlans.getCoverageDiagnostics(companyId, planId, {
 // Returns: { diagnostics: Record<string, unknown>[], total: number }
 ```
 
+## Weather
+
+```js
+// Daily weather for a location with prior-week and prior-year comparisons
+client.weather.getLocationWeather(companyId, locationName, {
+  startDate: "YYYY-MM-DD",  // required
+  endDate: "YYYY-MM-DD",    // required
+  loadSource?,               // optional POS identifier
+})
+// Returns:
+// {
+//   location,
+//   data: [{
+//     date, minTempF, maxTempF, rainfallIn, snowIn, windSpeedMph,
+//     hasRain, hasSnow, isHeavyPrecip,
+//     tempCategory: "cold" | "normal" | "hot",
+//     priorWeek: { ...same fields } | null,
+//     priorYear: { ...same fields } | null,
+//   }],
+//   summary: { avgMinTemp, avgMaxTemp, totalRainfallIn, totalSnowIn,
+//              daysWithPrecip, totalDays, coldDays, hotDays },
+//   priorWeekSummary: WeatherSummary | null,
+//   priorYearSummary: WeatherSummary | null,
+// }
+```
+
+## Labor
+
+```js
+// Daily labor cost across a date range (optionally filtered to one location)
+client.labor.getByDay(companyId, {
+  startDate: "YYYY-MM-DD",  // required
+  endDate: "YYYY-MM-DD",    // required
+  location?,                 // optional location filter
+  loadSource?,               // optional POS identifier
+})
+// Returns:
+// { location, data: [{ date, laborCost }], summary: { totalLaborCost, avgDailyLaborCost, totalDays } }
+
+// Labor cost rolled up by location across a date range
+client.labor.getByLocation(companyId, {
+  startDate: "YYYY-MM-DD",  // required
+  endDate: "YYYY-MM-DD",    // required
+  loadSource?,
+})
+// Returns:
+// { data: [{ location, laborCost }], summary: { totalLaborCost, locationCount } }
+
+// Labor hours + prorated cost bucketed by hour-of-day (0-23) for one location
+client.labor.getByHour(companyId, locationName, {
+  startDate: "YYYY-MM-DD",  // required
+  endDate: "YYYY-MM-DD",    // required
+  loadSource?,
+})
+// Returns:
+// {
+//   location,
+//   data: [{ hourOfDay, laborHours, laborCost }, ...24 rows],
+//   summary: { totalLaborHours, totalLaborCost, peakHour, peakHourLaborCost }
+// }
+```
+
+## Fiscal Calendar
+
+Resolve a fiscal or calendar reporting period to concrete `start_date` / `end_date`
+(plus an optional comparison window) using the company's configured fiscal
+calendar. Pass the returned `start_date` and `end_date` straight to the other
+data endpoints (sales, labor, weather, etc).
+
+```js
+// Calendar year-to-date through reportEndDate
+client.fiscalCalendar.resolveCalendarYtd(companyId, {
+  reportEndDate: "YYYY-MM-DD",  // required
+  comparison?,                    // "prior_year" | "prior_period" | "none"
+})
+
+// Fiscal year-to-date through reportEndDate
+client.fiscalCalendar.resolveFiscalYtd(companyId, {
+  reportEndDate: "YYYY-MM-DD",  // required
+  comparison?,
+})
+
+// Calendar month (month containing reportEndDate, or explicit year+month)
+client.fiscalCalendar.resolveCalendarMonth(companyId, {
+  reportEndDate: "YYYY-MM-DD",  // required
+  year?,                          // optional, must pair with month
+  month?,                         // 1-12, optional
+  comparison?,
+})
+
+// Fiscal period (P1-P13). Either reportEndDate OR fiscalYear+fiscalPeriod.
+client.fiscalCalendar.resolveFiscalPeriod(companyId, {
+  reportEndDate?,
+  fiscalYear?,
+  fiscalPeriod?,                  // 1-13
+  comparison?,
+})
+
+// Fiscal week (FW1-FW53). Either reportEndDate OR fiscalYear+fiscalWeek.
+client.fiscalCalendar.resolveFiscalWeek(companyId, {
+  reportEndDate?,
+  fiscalYear?,
+  fiscalWeek?,                    // 1-53
+  comparison?,
+})
+
+// Explicit range with custom qualification anchor
+client.fiscalCalendar.resolveDateRange(companyId, {
+  startDate: "YYYY-MM-DD",        // required
+  endDate: "YYYY-MM-DD",          // required
+  qualificationAnchorDate: "YYYY-MM-DD",  // required
+  comparison?,
+})
+
+// Generic — pass the raw discriminated-union spec directly
+client.fiscalCalendar.resolvePeriod(companyId, { period_type: "fiscal_period", ... })
+```
+
+All methods return a `PeriodResolutionResult` (`start_date`, `end_date`,
+`comparison_start_date`/`comparison_end_date`, `fiscal_year`, `fiscal_period`,
+`fiscal_week`, `config_snapshot`, `audit`, etc).
+
 ## Error Handling
 
 ```js
