@@ -1,6 +1,6 @@
 {
   "name": "quantiiv",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Query Quantiiv analytics data — sales, products, pricing, elasticity — using the @quantiiv-ai/sdk",
   "author": {
     "name": "Quantiiv",
