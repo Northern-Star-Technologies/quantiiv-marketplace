@@ -235,6 +235,23 @@ client.labor.getByHour(companyId, locationName, {
 //   data: [{ hourOfDay, laborHours, laborCost }, ...24 rows],
 //   summary: { totalLaborHours, totalLaborCost, peakHour, peakHourLaborCost }
 // }
+
+// Daily labor hours + cost grouped by location and job title/position.
+// Use to compute sales per labor hour (SPLH) with custom excluded job-code
+// denominators, and to build role-based labor breakouts.
+client.labor.getByJob(companyId, {
+  startDate: "YYYY-MM-DD",  // required
+  endDate: "YYYY-MM-DD",    // required
+  location?,                 // optional exact location filter
+  jobTitle?,                 // optional exact job title / position filter
+  loadSource?,
+})
+// Returns:
+// {
+//   location, jobTitle,
+//   data: [{ date, location, jobTitle, regularHours, overtimeHours, laborHours, laborCost, entryCount }],
+//   summary: { totalLaborHours, totalRegularHours, totalOvertimeHours, totalLaborCost, totalDays, locationCount, jobTitleCount }
+// }
 ```
 
 ## Fiscal Calendar
