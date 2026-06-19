@@ -19,6 +19,9 @@ client.companies.list({ search?, page?, limit? })
 // Get company details
 client.companies.get(companyId)
 // Returns: Company (with users, locations, features)
+// Company.most_recent_data_date: Monday that starts the most recent week with data.
+//   Latest data spans most_recent_data_date (Mon) .. most_recent_data_date + 6 (Sun).
+//   Anchor "latest"/"this week"/relative ranges here, not to today's date.
 
 // Get company's locations
 client.companies.listLocations(companyId)
