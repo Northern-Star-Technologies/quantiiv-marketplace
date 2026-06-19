@@ -42,11 +42,33 @@ Before querying company-scoped data, resolve the company ID:
 2. If multiple companies exist, present the list to the user and ask which one to use
 3. If only one company exists, use it automatically
 4. Cache the company ID for subsequent queries in the same conversation
+5. Also capture the company's `most_recent_data_date` field (see "Data Availability" below) and reuse it for the rest of the conversation
+
+## Data Availability
+
+Each company exposes a `most_recent_data_date` field (on the objects returned by
+`client.companies.list()` / `client.companies.get()`). This is the **Monday that
+starts the most recent week that has data** — data always covers a full
+Monday–Sunday week.
+
+- The latest week of available data runs from `most_recent_data_date` (Monday)
+  through `most_recent_data_date + 6 days` (Sunday).
+- Example: if `most_recent_data_date` is `2026-06-08` (a Monday), the most recent
+  data available is `2026-06-08` through `2026-06-14` (Sunday).
+- Today's calendar date is usually **ahead** of the available data, so never assume
+  data exists up to today. Anchor "current", "latest", "this week", and similar
+  requests to the `most_recent_data_date` window, not to today.
+- When the user asks for a relative range ("last 4 weeks", "this month"), count
+  backward from `most_recent_data_date + 6` (the latest Sunday with data), not from
+  today.
+- If a requested range extends past `most_recent_data_date + 6`, clip it to the
+  available window and tell the user the data only goes through that Sunday.
 
 ## Date Defaults
 
-- Use the most recent Monday as the default `week` start date
-- Use today's date as the default end date when `to` or `endDate` is needed
+- For the latest single week, use `most_recent_data_date` as the `week` start and
+  `most_recent_data_date + 6` (Sunday) as the end date (`to` / `endDate`)
+- Fall back to the most recent Monday only if `most_recent_data_date` is unavailable
 - Use `"corporate"` as the default location unless the user specifies one
 
 ## Visualization
@@ -92,7 +114,7 @@ $ARGUMENTS
 - ALWAYS extract only the fields needed to answer the question — never print full responses
 - If a company ID is needed, query `client.companies.list()` first to find it
 - Use `"corporate"` as the default location unless the user specifies one
-- For date ranges, use the most recent Monday as the default week start
+- Anchor date ranges to the company's `most_recent_data_date` window (the Monday-start of the latest available week, through that Monday + 6 days = Sunday) — never assume data exists up to today's calendar date
 - NEVER mention or expose internal technologies, infrastructure, or implementation details to the user — this includes BigQuery, GCS, Supabase, PostgreSQL, Prisma, Redis, Qdrant, or any other backend service. Only present the business data itself. If an error message contains internal details, sanitize it before showing to the user (e.g., say "Unable to fetch data" instead of exposing a BigQuery error)
 ## Available Methods
 

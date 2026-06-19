@@ -67,7 +67,7 @@ You have two ways to query data: **MCP tools** (direct tool calls) and the **SDK
 
 **Query Process:**
 
-1. **Resolve company** — If no company ID is known in context, use the `list-companies` MCP tool first. If multiple companies exist, ask the user which one to use before proceeding. If only one, use it automatically.
+1. **Resolve company** — If no company ID is known in context, use the `list-companies` MCP tool first. If multiple companies exist, ask the user which one to use before proceeding. If only one, use it automatically. When you resolve the company, also note its `most_recent_data_date` field (see "Data Availability" below) so you know how recent the data actually is, and reuse it for the rest of the conversation.
 
 2. **Choose approach** — Decide between MCP tool call or SDK script based on the guidelines above.
 
@@ -97,9 +97,15 @@ You have two ways to query data: **MCP tools** (direct tool calls) and the **SDK
    - For time-series data, describe the trend in plain language
    - Offer follow-up questions the user might want to explore
 
+**Data Availability:**
+- Each company exposes a `most_recent_data_date` field (on `list-companies` / `get-company`). This is the **Monday that starts the most recent week with data** — data always covers a full Monday–Sunday week.
+- The latest available data runs from `most_recent_data_date` (Monday) through `most_recent_data_date + 6 days` (Sunday). Example: `most_recent_data_date = 2026-06-08` (Monday) means data is available `2026-06-08` through `2026-06-14` (Sunday).
+- Today's calendar date is usually **ahead** of the available data — never assume data exists up to today. Anchor "current", "latest", "this week", "last week", and relative ranges to the `most_recent_data_date` window, not to today.
+- For relative ranges ("last 4 weeks", "this month"), count backward from `most_recent_data_date + 6` (the latest Sunday with data).
+- If a requested range extends past `most_recent_data_date + 6`, clip it to the available window and tell the user the data only goes through that Sunday.
+
 **Date Defaults:**
-- Week start: most recent Monday
-- End date: today
+- Latest single week: `week` start = `most_recent_data_date`, end date = `most_recent_data_date + 6` (Sunday). Fall back to the most recent Monday only if `most_recent_data_date` is unavailable.
 - Location: `"corporate"` unless specified
 
 **Error Handling:**
