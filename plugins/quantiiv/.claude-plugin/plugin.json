@@ -1,6 +1,6 @@
 {
   "name": "quantiiv",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Query Quantiiv analytics data — sales, products, labor, weather — using the @quantiiv-ai/sdk",
   "author": {
     "name": "Quantiiv",
