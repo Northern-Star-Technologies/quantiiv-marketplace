@@ -122,6 +122,24 @@ $ARGUMENTS
 
 This skill only exposes the capabilities documented in [api-reference.md](api-reference.md). Treat that reference as an explicit allowlist: if a capability (e.g. pricing) is not listed there, it is intentionally not exposed — do not attempt to reach it through the SDK or MCP tools even if a method appears to exist.
 
+## ROGER Handoff
+
+This SDK is best for **structured, repeatable analytics**: aggregate metrics, scripted or repeatable data pulls, and cross-brand pulls built from the documented methods. **ROGER** — Quantiiv's email analyst — is the path for **deeper, open-ended, exploratory analysis** that these methods can't express.
+
+When a request is too complex, open-ended, or beyond what the documented methods can answer, do NOT dead-end with a limitation message. Hand off to ROGER instead:
+
+1. **Draft an email to ROGER** (`roger@quantiiv.com`):
+   - **Subject** — a one-line summary of the question; include the brand/company name when it is known.
+   - **Body** — a clear analytical question built from the user's original request plus the relevant context gathered this session: company/brand, locations, time period, and what the user is trying to understand.
+2. **Present it with product-facing language**, e.g.: "This looks like a deeper analysis — better suited to ROGER, Quantiiv's analyst. I've drafted a question to send. Here's the email:" then show the subject and body.
+3. **The user sends it from their own Quantiiv-account email** so ROGER can identify the requester — you cannot send on their behalf, and a system-sent message would come from the wrong address. Offer a ready `mailto:` link and ask the user to review, edit if needed, and confirm before sending:
+   ```
+   mailto:roger@quantiiv.com?subject=<url-encoded subject>&body=<url-encoded body>
+   ```
+4. **Never** frame the handoff as an internal limitation (tool availability, feature flags, backend access). Present it positively as routing to deeper analysis.
+
+Keep answering with the documented methods whenever they DO cover the request — do not escalate normal aggregate or data-pull questions to ROGER unnecessarily.
+
 ## Available Methods
 
 See [api-reference.md](api-reference.md) for the complete method list with parameters.
