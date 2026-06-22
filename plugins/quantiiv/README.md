@@ -1,6 +1,6 @@
 # Quantiiv Plugin for Claude Code
 
-Query your Quantiiv analytics data directly from Claude Code. Ask business questions about sales, products, pricing, and elasticity — Claude fetches the data and presents actionable insights.
+Query your Quantiiv analytics data directly from Claude Code. Ask business questions about sales, products, labor, and weather — Claude fetches the data and presents actionable insights.
 
 ## Features
 
@@ -47,7 +47,7 @@ This will:
 
 ```
 /quantiiv:query what were my top sellers last week?
-/quantiiv:query show me pricing opportunities for beverages
+/quantiiv:query how did delivery sales perform last month?
 /quantiiv:query how is the Chicken Sandwich doing across locations?
 ```
 
@@ -58,7 +58,7 @@ Just ask business questions — the analyst agent triggers automatically:
 - "What are my top movers by net sales?"
 - "Show me menu group metrics for this week"
 - "List my companies and locations"
-- "What pricing opportunities do I have?"
+- "What's my labor cost by location this week?"
 - "How did delivery sales perform last month?"
 
 ## Components
