@@ -7,7 +7,7 @@ argument-hint: (no arguments needed)
 
 # Quantiiv Setup
 
-Configure the Quantiiv API key, fetch a temporary registry token from the private GCS registry, install the `@quantiiv-ai/sdk`, and verify the connection.
+Configure the Quantiiv API key, fetch a temporary registry token from Quantiiv's private package registry, install the `@quantiiv-ai/sdk`, and verify the connection.
 
 ## Step 1: Collect API Key
 
@@ -29,7 +29,7 @@ Read the existing `~/.claude/settings.json` first, merge the new env vars with a
 
 ## Step 3: Install the SDK
 
-The SDK is hosted on a private GCS npm registry. Installation requires two steps:
+The SDK is hosted on Quantiiv's private npm registry. Installation requires two steps:
 
 1. **Fetch a temporary registry token** using the API key collected in Step 1:
 

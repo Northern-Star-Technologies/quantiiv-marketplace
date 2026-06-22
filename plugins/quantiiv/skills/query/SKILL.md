@@ -9,6 +9,8 @@ argument-hint: <question about your business data>
 
 Query Quantiiv analytics data programmatically using the `@quantiiv-ai/sdk` npm package. Always use this SDK-based approach rather than raw API calls to keep response payloads out of context. Write and execute Node.js scripts that call SDK methods and extract only the fields needed to answer the question.
 
+This skill is best for **dashboard-safe aggregates, repeatable and scriptable data pulls, and cross-brand pulls**. For deeper, open-ended, or exploratory analysis it can't express, route the user to ROGER (see [ROGER Handoff](#roger-handoff)) instead of describing what the skill can't do.
+
 ## Global SDK Resolution
 
 The SDK is installed globally. Always set `NODE_PATH` to the global `node_modules` so Node.js finds it regardless of the current working directory:
@@ -105,6 +107,8 @@ const client = new QuantiivClient({
 '
 ```
 
+The captured error fields (`status`, `body`, `message`) are for **your reasoning only** — they may contain internal system or infrastructure details. Never surface a raw error to the user. Respond with brief product-facing language (e.g. "I couldn't pull that data — want me to try a different period?"), and if the request is out of scope, use the [ROGER Handoff](#roger-handoff).
+
 ## User Request
 
 $ARGUMENTS
@@ -115,7 +119,9 @@ $ARGUMENTS
 - If a company ID is needed, query `client.companies.list()` first to find it
 - Use `"corporate"` as the default location unless the user specifies one
 - Anchor date ranges to the company's `most_recent_data_date` window (the Monday-start of the latest available week, through that Monday + 6 days = Sunday) — never assume data exists up to today's calendar date
-- NEVER mention or expose internal technologies, infrastructure, or implementation details to the user — this includes BigQuery, GCS, Supabase, PostgreSQL, Prisma, Redis, Qdrant, or any other backend service. Only present the business data itself. If an error message contains internal details, sanitize it before showing to the user (e.g., say "Unable to fetch data" instead of exposing a BigQuery error)
+- Keep every response product-facing. NEVER mention or expose internal technologies, infrastructure, access, or implementation details — including BigQuery, GCS, Supabase, PostgreSQL, Prisma, Redis, Qdrant, feature flags, table/dataset availability, or any backend service. Present only the business data and the path to get it.
+- Never explain an inability in internal terms. Do NOT say things like "I don't have access to BigQuery", "that feature flag is off", "the table isn't available", or "the backend doesn't support that". When a request can't be answered, use brief product-facing language and route deeper or exploratory questions to the [ROGER Handoff](#roger-handoff).
+- Treat raw API errors as internal: never show `err.body`, `err.message`, or status text to the user — sanitize to something like "Unable to fetch data, please try again."
 - Pricing, elasticity, and repricing are NOT available through this interface. Do not query, describe, or offer pricing plans, pricing opportunities, price elasticity, or repricing recommendations. If the user asks for any of these, respond with brief product-facing language such as "Pricing analytics aren't available here" and redirect to the supported sales, product, labor, weather, and fiscal-calendar metrics — without referencing internal tools, endpoints, or why the capability is withheld.
 
 ## Exposure Model
