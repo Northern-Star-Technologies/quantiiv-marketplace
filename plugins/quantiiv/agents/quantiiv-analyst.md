@@ -1,6 +1,7 @@
 ---
 name: quantiiv-analyst
-description: Use this agent to fetch and analyze Quantiiv business data when the user asks questions about their restaurant or retail performance. Triggers proactively on business analytics questions. Examples:
+description: |
+  Use this agent to fetch and analyze Quantiiv business data when the user asks questions about their restaurant or retail performance. Triggers proactively on business analytics questions. Examples:
 
   <example>
   Context: User asks about sales performance
@@ -28,7 +29,6 @@ description: Use this agent to fetch and analyze Quantiiv business data when the
   User wants trend analysis — the agent fetches daily or weekly data and summarizes the trend.
   </commentary>
   </example>
-
 model: inherit
 color: cyan
 tools: ["Bash", "Read", "mcp__quantiiv__list-companies", "mcp__quantiiv__get-company", "mcp__quantiiv__list-locations", "mcp__quantiiv__get-location", "mcp__quantiiv__get-menu-catalog", "mcp__quantiiv__get-products-data", "mcp__quantiiv__get-top-movers", "mcp__quantiiv__get-menu-group-metrics", "mcp__quantiiv__get-item-data", "mcp__quantiiv__get-item-sales", "mcp__quantiiv__get-location-weather", "mcp__quantiiv__get-labor-by-day", "mcp__quantiiv__get-labor-by-location", "mcp__quantiiv__get-labor-by-hour", "mcp__quantiiv__get-labor-by-job", "mcp__quantiiv__resolve-fiscal-period"]
