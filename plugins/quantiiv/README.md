@@ -8,6 +8,7 @@ Query your Quantiiv analytics data directly from Claude Code. Ask business quest
 - **Proactive analysis** — The analyst agent detects business questions and fetches data automatically
 - **Setup wizard** — `/quantiiv:setup` installs the SDK and configures credentials
 - **Session checks** — Alerts you if the SDK or credentials are missing when you start a session
+- **Business calendar context** — look up promos, closures, remodels, and observed holidays (read-only)
 
 ## Prerequisites
 
@@ -66,6 +67,7 @@ Just ask business questions — the analyst agent triggers automatically:
 | Component | Type | Description |
 |-----------|------|-------------|
 | `query` | Skill | Explicit data queries via `/quantiiv:query` |
+| `calendar` | Skill | Look up Quantiiv Business Calendar events (read-only) |
 | `setup` | Skill | SDK installation and credential configuration |
 | `quantiiv-analyst` | Agent | Proactive business data fetching and analysis |
 | `check-setup` | Hook | Session-start check for SDK and credentials |

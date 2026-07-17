@@ -1,6 +1,16 @@
 ---
 name: query
-description: This skill should be used when the user asks about "sales data", "top sellers", "menu items", "product performance", "company locations", "menu groups", "store performance", "weekly sales summary", "weather", "rainfall", "temperature", "labor", "labor cost", "labor hours", "staffing", "scheduling", "sales per labor hour", "SPLH", "labor by job", "labor by role", "labor by position", "fiscal period", "fiscal week", "fiscal year", "fiscal calendar", "P1..P13", "FW1..FW53", "YTD", or any Quantiiv analytics metrics. Also triggered by questions like "what were my top movers", "show me sales trends", "how is this product doing", "list my companies", "compare store performance", "revenue by menu group", "daily sales for [item]", "what was the weather at [location]", "did weather affect sales", "what's my labor cost", "peak labor hours", "labor by location", "am I overstaffed at [hour]", "what's my sales per labor hour", "labor cost by role", "hours by position", "what were sales in P3", "fiscal YTD numbers", "this fiscal week", "compare to prior period". When a user references a fiscal period name (e.g. "P3 of FY2026", "fiscal Q1", "fiscal week 12"), resolve it via `client.fiscalCalendar` first to get concrete start/end dates, then pass those dates to the sales/labor/weather endpoints.
+description: |
+  Quantiiv business analytics for a restaurant company — sales, products, menu groups, locations,
+  labor, staffing, weather, and fiscal periods. Use when the user asks what a number is or how it
+  moved: top sellers and top movers, product or store performance, revenue breakdowns, labor cost
+  and sales per labor hour, weather alongside sales, or results for a named fiscal period ("what
+  were sales in P3", "fiscal YTD", "this fiscal week", "compare to prior period"). This skill
+  answers what moved and by how much, over a date range. It is not the business calendar: dated
+  operational events (promotions, closures, remodels, holidays) live in the `calendar` skill —
+  reach for that one when the user asks *why* a number moved, and compose the two. Pricing,
+  elasticity, and repricing are not available here. For deep or open-ended analysis these
+  aggregates cannot express, route to ROGER rather than declining.
 allowed-tools: Bash
 argument-hint: <question about your business data>
 ---
@@ -49,29 +59,44 @@ Before querying company-scoped data, resolve the company ID:
 ## Data Availability
 
 Each company exposes a `most_recent_data_date` field (on the objects returned by
-`client.companies.list()` / `client.companies.get()`). This is the **Monday that
-starts the most recent week that has data** — data always covers a full
-Monday–Sunday week.
+`client.companies.list()` / `client.companies.get()`). It is the **start of the most recent week
+that has data**, and a week of data runs from it through the following six days.
 
-- The latest week of available data runs from `most_recent_data_date` (Monday)
-  through `most_recent_data_date + 6 days` (Sunday).
-- Example: if `most_recent_data_date` is `2026-06-08` (a Monday), the most recent
-  data available is `2026-06-08` through `2026-06-14` (Sunday).
+**Do not assume that day is a Monday.** A company's week start is configurable, and Monday is only
+the default — the field is stored as given and is not aligned for you. Read the company's fiscal
+week start rather than hardcoding a weekday, and derive the window's end from
+`most_recent_data_date + 6` rather than from "Sunday". A window anchored to the wrong weekday
+returns real numbers for the wrong days, which is worse than an error: nothing fails, and the
+answer is confidently wrong.
+
+- The latest week of available data runs from `most_recent_data_date` through
+  `most_recent_data_date + 6 days`.
 - Today's calendar date is usually **ahead** of the available data, so never assume
   data exists up to today. Anchor "current", "latest", "this week", and similar
   requests to the `most_recent_data_date` window, not to today.
 - When the user asks for a relative range ("last 4 weeks", "this month"), count
-  backward from `most_recent_data_date + 6` (the latest Sunday with data), not from
+  backward from `most_recent_data_date + 6` (the latest day with data), not from
   today.
 - If a requested range extends past `most_recent_data_date + 6`, clip it to the
-  available window and tell the user the data only goes through that Sunday.
+  available window and tell the user how far the data actually goes.
 
 ## Date Defaults
 
 - For the latest single week, use `most_recent_data_date` as the `week` start and
-  `most_recent_data_date + 6` (Sunday) as the end date (`to` / `endDate`)
-- Fall back to the most recent Monday only if `most_recent_data_date` is unavailable
+  `most_recent_data_date + 6` as the end date (`to` / `endDate`)
+- If `most_recent_data_date` is unavailable, ask rather than guessing a weekday
 - Use `"corporate"` as the default location unless the user specifies one
+
+## Explaining a Move
+
+This skill answers *what* moved and by how much. Dated business events — promos, closures,
+holidays — live on the business calendar, not in these metrics. When the user asks *why* a metric
+moved, do not speculate from the numbers alone: resolve the window's events with the `calendar`
+skill and report what co-occurred alongside them.
+
+Co-occurrence is the deliverable. You have no counterfactual — you cannot know what the day would
+have looked like without the event — so an overlapping event is context you hand over, never the
+reason a number changed. The conclusion belongs to the operator; they know their business.
 
 ## Visualization
 
@@ -118,7 +143,7 @@ $ARGUMENTS
 - ALWAYS extract only the fields needed to answer the question — never print full responses
 - If a company ID is needed, query `client.companies.list()` first to find it
 - Use `"corporate"` as the default location unless the user specifies one
-- Anchor date ranges to the company's `most_recent_data_date` window (the Monday-start of the latest available week, through that Monday + 6 days = Sunday) — never assume data exists up to today's calendar date
+- Anchor date ranges to the company's `most_recent_data_date` window (the start of the latest available week, through that day + 6) — never assume data exists up to today's calendar date, and never assume the week starts on a Monday
 - Keep every response product-facing. NEVER mention or expose internal technologies, infrastructure, access, or implementation details — including BigQuery, GCS, Supabase, PostgreSQL, Prisma, Redis, Qdrant, feature flags, table/dataset availability, or any backend service. Present only the business data and the path to get it.
 - Never explain an inability in internal terms. Do NOT say things like "I don't have access to BigQuery", "that feature flag is off", "the table isn't available", or "the backend doesn't support that". When a request can't be answered, use brief product-facing language and route deeper or exploratory questions to the [ROGER Handoff](#roger-handoff).
 - Treat raw API errors as internal: never show `err.body`, `err.message`, or status text to the user — sanitize to something like "Unable to fetch data, please try again."
