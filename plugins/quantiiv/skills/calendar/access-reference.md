@@ -30,13 +30,6 @@ hidden from them.
   membership is set when it's created or edited.
 - **Categories are unrelated to visibility.** A category is a name-and-color label for filing and
   filtering, nothing more. Filing an event under a category never changes who can see it.
-- **There is no creation default.** Every create must state its scope explicitly — the API rejects a
-  create that omits one. Nothing is inferred from who is recording the event, so never assume a
-  scope: read what you may set from `viewer.canCreate` and confirm the reach with the user first.
-- **Removing an event from a group removes that group's grant.** It does not guarantee the people it
-  covered lose sight of the event — reach is additive, so someone may still see it through another
-  scope or group, as the event's creator, or as a Restaurant Admin. Never promise that taking a
-  group off an event hides it from a particular person.
 - **Managing access groups — creating, renaming, or changing membership — is not exposed by this
   skill**, and not by an email to ROGER. It lives in the Console, for Restaurant Admins.
 

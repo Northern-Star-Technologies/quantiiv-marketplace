@@ -2,29 +2,26 @@
 name: calendar
 description: |
   The Quantiiv BUSINESS calendar — a restaurant company's record of dated operational events
-  that give context to store performance. Use when the user asks about, or wants to record, any
-  dated thing that happened to the business — these are common cases, not the whole set:
-  promotion, promo, LTO, limited time offer, BOGO, closure, closed for remodel, grand opening,
-  inspection, training day, store event, observed holiday. Examples: "what promos ran in June",
-  "was there a promo on the 14th", "is the store closed on the 4th", "any store events next
-  month", "log a BOGO for next Tuesday", "record that Midtown is closed for remodel", "archive
-  that promo". Not a personal calendar: every Quantiiv event belongs to a company and carries a
-  company-wide, corporate, per-store, or access-group scope, so this skill cannot see meetings,
-  appointments, availability, or anything in Google Calendar, Outlook, or iCal. For sales, labor,
-  weather, or fiscal metrics, use the `query` skill.
+  that give context to store performance. Use when the user asks about any dated thing that
+  happened to the business — these are common cases, not the whole set: promotion, promo, LTO,
+  limited time offer, BOGO, closure, closed for remodel, grand opening, inspection, training day,
+  store event, observed holiday. Examples: "what promos ran in June", "was there a promo on the
+  14th", "is the store closed on the 4th", "any store events next month". Read-only — it looks
+  events up but does not record them; to add, change, or archive an event it hands off to ROGER.
+  Not a personal calendar: every Quantiiv event belongs to a company and carries a company-wide,
+  corporate, per-store, or access-group scope, so this skill cannot see meetings, appointments,
+  availability, or anything in Google Calendar, Outlook, or iCal. For sales, labor, weather, or
+  fiscal metrics, use the `query` skill.
 allowed-tools: Read, mcp__quantiiv__list-companies, mcp__quantiiv__list-calendar-events,
-  mcp__quantiiv__get-calendar-event,
-  mcp__quantiiv__list-calendar-facets, mcp__quantiiv__list-calendar-categories,
-  mcp__quantiiv__list-access-groups, mcp__quantiiv__get-holiday-settings,
-  mcp__quantiiv__list-locations, mcp__quantiiv__create-calendar-event,
-  mcp__quantiiv__update-calendar-event, mcp__quantiiv__archive-calendar-event,
-  mcp__quantiiv__create-calendar-category
-argument-hint: <question about the Quantiiv business calendar, or a store event to record>
+  mcp__quantiiv__get-calendar-event, mcp__quantiiv__list-calendar-facets,
+  mcp__quantiiv__list-calendar-categories, mcp__quantiiv__list-access-groups,
+  mcp__quantiiv__get-holiday-settings, mcp__quantiiv__list-locations
+argument-hint: <question about the Quantiiv business calendar>
 ---
 
 # Quantiiv Business Calendar
 
-Find and record the dated operational events — promotions, closures, remodels, grand openings,
+Find the dated operational events — promotions, closures, remodels, grand openings,
 observed holidays — that give context to store performance. This skill orchestrates typed MCP
 tools; it never constructs a request by hand. For sales, labor, weather, or fiscal metrics, use the `query`
 skill instead. When a question needs both ("what was running the week sales dropped?"), resolve the
@@ -61,15 +58,11 @@ Every tool call is typed — you never build a URL or a JSON body by hand.
 |---|---|
 | `list-calendar-events` | The primary lookup. `startDate` and `endDate` are both required. |
 | `get-calendar-event` | Full detail on one event, once you have its `id`. |
-| `list-calendar-facets` | Cheap orientation — the categories and tags actually in use. Call before any tagged write. |
+| `list-calendar-facets` | Cheap orientation — the categories and tags actually in use. |
 | `list-calendar-categories` | Resolve a category name to its `categoryId` before using one. |
 | `list-access-groups` | Resolve a named access group before using an `audienceId`. |
 | `list-locations` | Resolve a store name to a location id. Never invent one. |
 | `get-holiday-settings` | The company's observed-holiday configuration. |
-
-**Writes:** `create-calendar-event`, `update-calendar-event`, `archive-calendar-event`,
-`create-calendar-category`. See [Writing to the Calendar](#writing-to-the-calendar) before using
-any of these.
 
 ## Date Discipline
 
@@ -87,9 +80,8 @@ The calendar is **forward-looking** — do not anchor it to a company's most-rec
 ## Access Honesty
 
 `list-calendar-events`, `get-calendar-event`, and `list-calendar-facets` return a `viewer` field.
-Reason from it, not from memory or inference. Category, access-group, and holiday lookups do **not**
-carry `viewer` — and neither do write responses, so read `viewer.canCreate` from one of the three
-lookups above *before* you write, never from the result of the write.
+Reason from it, not from memory or inference. Category, access-group, and holiday lookups do not
+carry `viewer`.
 
 > When `viewer.sees` is `"subset"`, your answer must not assert completeness — say "the events
 > visible to you", "no events visible to you in that window". Never "there are no events" or
@@ -127,8 +119,9 @@ Plus:
 - Never explain invisibility in internal terms — describe *reach* ("everyone at your company", "the
   stores you named"), never *rank*, and never name a role.
 - Never surface a raw error body.
-- Never offer to manage access groups — that's Console-only. (Creating, updating, and archiving
-  events is in scope — see [Writing to the Calendar](#writing-to-the-calendar).)
+- Never offer to manage access groups, and never offer to create, change, or archive an event —
+  those aren't in this skill. Route any such request to ROGER or the Console (see ROGER Handoff
+  below).
 
 ## Exposure Model
 
@@ -140,14 +133,9 @@ In particular:
 
 - **Archived and deleted events aren't available here** — they're in the Console. If a user asks for
   them, say that, and do not attempt a lookup.
-- Hard delete is never exposed. To remove, retire, or cancel an event, archive it.
-- Renaming or deleting a category is Console-only. This skill can only *create* a category.
-
-## Writing to the Calendar
-
-**Before your first create, update, or archive in a conversation, read `creation-reference.md`.
-This is a precondition, not a suggestion — it carries the scoping rules and failure handling, and
-this file does not.**
+- This skill does not create, update, archive, or delete anything. Recording a new event or
+  changing or archiving an existing one routes to ROGER or the Console — see ROGER Handoff below.
+- Renaming, deleting, or creating a category is not exposed here.
 
 ## Response Handling
 
@@ -174,15 +162,8 @@ never read the raw message text to the user.
 
 | `code` | What you say |
 |---|---|
-| `scope_not_permitted` | "That one reaches beyond your stores, so I can't record it here. I can draft it for the Console, or send it to ROGER." |
-| `credential_missing_write` | "Your Quantiiv connection is set up for reading the calendar but not for changes — run `/quantiiv:setup` to update it." |
-| `conflict_stale` | Someone changed the event since you read it. Re-read it, show the user what changed, and ask before retrying. **Never blind-retry.** |
-| `near_duplicate` | A 409 — **the write did not commit**. Not a failure to report as one: it means the name already exists in another form. See `creation-reference.md`, then file under the existing name. |
-| `internal_error` | **The outcome is unknown — the event may already exist.** Look it up before anything else. If it is there, it worked: tell the user it's recorded. Only if it is absent may you offer to try again. **Never retry first** — there is no protection against filing the same event twice. |
-| `recurrence_invalid` | The repeat rule can never land on a real date — usually a day-of-month that the chosen months don't have (a 31st in a 30-day month). Retrying it unchanged fails identically. Say which part doesn't work and ask for a rule that can land. |
-| `precondition_required`, `not_found` | You are working from a stale or wrong reference. Look the event up again and start from what you find. Retrying unchanged cannot succeed. |
-| a `holiday_*` code | This is a managed holiday, not an ordinary event — it is governed by the company's holiday settings, not by editing it here. Say it's managed centrally and point at the Console. |
-| anything else | "I couldn't record that." Offer the Console or ROGER. Do **not** offer to retry unless you have first looked the event up and confirmed it isn't there. |
+| `scope_not_permitted` | "That reaches beyond what you can see here — I can point you to the Console or ROGER." |
+| anything else | "I couldn't look that up." Offer the Console or ROGER. |
 
 **Never say to the user:** "interactive user required", "developer token", "session", "sign in",
 "Firebase", "Firestore", "permission denied", "403", a code role name, or any error text verbatim.
@@ -205,5 +186,6 @@ a limitation message:
 3. The user sends it from their own Quantiiv-account email — you cannot send on their behalf.
 
 Also route to ROGER or the Console, without explaining in internal terms, for anything this skill
-does not expose: a request to permanently remove an event (offer archive instead), a question about
-an archived event, or a request to manage access groups.
+does not expose — it reads the calendar, it does not modify it: recording a new event, changing or
+archiving an existing event, a question about an archived event, or a request to manage access
+groups.
