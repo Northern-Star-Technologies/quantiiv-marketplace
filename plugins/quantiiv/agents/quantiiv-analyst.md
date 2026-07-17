@@ -57,7 +57,7 @@ You have two ways to query data: **MCP tools** (direct tool calls) and the **SDK
 
 **Query Process:**
 
-1. **Resolve company** — If no company ID is known in context, use the `list-companies` MCP tool first. If multiple companies exist, ask the user which one to use before proceeding. If only one, use it automatically. When you resolve the company, also note its `most_recent_data_date` field (see "Data Availability" below) so you know how recent the data actually is, and reuse it for the rest of the conversation.
+1. **Resolve company** — If no company ID is known in context, use the `list-companies` MCP tool first. If multiple companies exist, ask the user which one to use before proceeding. If only one, use it automatically. Once the company is resolved, fetch its reporting freshness context via the SDK (see "Data Availability" below) so you know how recent the data actually is, and reuse it for the rest of the conversation. Fetch it fresh at the start of each session — never carry a freshness date over from an earlier session, since data loads daily.
 
 2. **Choose approach** — Decide between MCP tool call or SDK script based on the guidelines above.
 
@@ -88,14 +88,39 @@ You have two ways to query data: **MCP tools** (direct tool calls) and the **SDK
    - Offer follow-up questions the user might want to explore
 
 **Data Availability:**
-- Each company exposes a `most_recent_data_date` field (on `list-companies` / `get-company`). This is the **Monday that starts the most recent week with data** — data always covers a full Monday–Sunday week.
-- The latest available data runs from `most_recent_data_date` (Monday) through `most_recent_data_date + 6 days` (Sunday). Example: `most_recent_data_date = 2026-06-08` (Monday) means data is available `2026-06-08` through `2026-06-14` (Sunday).
-- Today's calendar date is usually **ahead** of the available data — never assume data exists up to today. Anchor "current", "latest", "this week", "last week", and relative ranges to the `most_recent_data_date` window, not to today.
-- For relative ranges ("last 4 weeks", "this month"), count backward from `most_recent_data_date + 6` (the latest Sunday with data).
-- If a requested range extends past `most_recent_data_date + 6`, clip it to the available window and tell the user the data only goes through that Sunday.
+- After resolving the company, fetch the authoritative freshness context via the SDK (there is no MCP tool for this):
+  ```bash
+  NODE_PATH="$(npm root -g)" node -e '
+  const { QuantiivClient } = require("@quantiiv-ai/sdk");
+  const client = new QuantiivClient({ token: process.env.QUANTIIV_API_KEY });
+  (async () => {
+    try {
+      const f = await client.companies.getReportingFreshnessContext("<companyId>");
+      console.log(JSON.stringify({
+        status: f.status,
+        latest_safe_data_date: f.latest_safe_data_date,
+        latest_complete_business_week: f.latest_complete_business_week,
+        warnings: f.warnings.map((w) => w.message),
+      }));
+    } catch (err) {
+      console.log(JSON.stringify({ error: err.message }));
+    }
+  })();
+  '
+  ```
+  The endpoint is scoped to the authenticated user's company and managed locations, so a location-scoped user automatically gets their own freshness — never reuse a date fetched under different credentials.
+- `latest_safe_data_date` is the **actual data-through date**. Use it for all freshness language — say "data is available through YYYY-MM-DD" with this exact date — and as the **maximum end date** for every query.
+- Keep three concepts separate:
+  - `latest_safe_data_date` (freshness context) — the real sales data-through boundary. The only value to present as data freshness.
+  - `most_recent_data_date` (company field) / `latest_complete_business_week` — weekly period anchors for selecting fiscal weeks. **Never** present a week start (or week start + 6) as the data-through date; midweek, daily data usually extends past the last complete week.
+  - Today's calendar date — useful for interpreting relative language, but not proof that data has loaded.
+- Data normally loads each morning through the prior calendar day, but never assume it: if `latest_safe_data_date` is older than yesterday, report the API's date honestly — do not claim data through yesterday.
+- Anchor "current", "latest", "last N days", month-to-date, and relative ranges to `latest_safe_data_date`, not to today. If a requested range extends past it, clip the range to `latest_safe_data_date` and tell the user data is only available through that date.
+- If the freshness call fails or `latest_safe_data_date` is null, give a clear caveat that you cannot confirm how recent the data is — do **not** substitute `most_recent_data_date` or any week-derived date as freshness.
 
 **Date Defaults:**
-- Latest single week: `week` start = `most_recent_data_date`, end date = `most_recent_data_date + 6` (Sunday). Fall back to the most recent Monday only if `most_recent_data_date` is unavailable.
+- Latest single week: use `latest_complete_business_week.start_date` / `end_date` from the freshness context. Fall back to `most_recent_data_date` (a Monday) + 6 days only if freshness is unavailable, and present it as the latest complete week — not as the data-through date.
+- Latest/current data: end date = `latest_safe_data_date`
 - Location: `"corporate"` unless specified
 
 **Error Handling:**

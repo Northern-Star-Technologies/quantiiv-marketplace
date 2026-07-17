@@ -44,33 +44,68 @@ Before querying company-scoped data, resolve the company ID:
 2. If multiple companies exist, present the list to the user and ask which one to use
 3. If only one company exists, use it automatically
 4. Cache the company ID for subsequent queries in the same conversation
-5. Also capture the company's `most_recent_data_date` field (see "Data Availability" below) and reuse it for the rest of the conversation
+5. Then fetch the company's reporting freshness context (see "Data Availability"
+   below) and reuse it for the rest of the conversation — but always fetch it
+   fresh at the start of a new session, since data loads daily
 
 ## Data Availability
 
-Each company exposes a `most_recent_data_date` field (on the objects returned by
-`client.companies.list()` / `client.companies.get()`). This is the **Monday that
-starts the most recent week that has data** — data always covers a full
-Monday–Sunday week.
+After resolving the company, fetch the authoritative freshness context:
 
-- The latest week of available data runs from `most_recent_data_date` (Monday)
-  through `most_recent_data_date + 6 days` (Sunday).
-- Example: if `most_recent_data_date` is `2026-06-08` (a Monday), the most recent
-  data available is `2026-06-08` through `2026-06-14` (Sunday).
-- Today's calendar date is usually **ahead** of the available data, so never assume
-  data exists up to today. Anchor "current", "latest", "this week", and similar
-  requests to the `most_recent_data_date` window, not to today.
-- When the user asks for a relative range ("last 4 weeks", "this month"), count
-  backward from `most_recent_data_date + 6` (the latest Sunday with data), not from
-  today.
-- If a requested range extends past `most_recent_data_date + 6`, clip it to the
-  available window and tell the user the data only goes through that Sunday.
+```bash
+NODE_PATH="$(npm root -g)" node -e '
+const { QuantiivClient } = require("@quantiiv-ai/sdk");
+const client = new QuantiivClient({ token: process.env.QUANTIIV_API_KEY });
+(async () => {
+  try {
+    const f = await client.companies.getReportingFreshnessContext("<companyId>");
+    console.log(JSON.stringify({
+      status: f.status,
+      latest_safe_data_date: f.latest_safe_data_date,
+      latest_complete_business_week: f.latest_complete_business_week,
+      warnings: f.warnings.map((w) => w.message),
+    }));
+  } catch (err) {
+    console.log(JSON.stringify({ error: err.message }));
+  }
+})();
+'
+```
+
+The endpoint is scoped to the authenticated user's company and managed
+locations, so a location-scoped user automatically gets their own freshness.
+
+- `latest_safe_data_date` is the **actual data-through date**. Use it for all
+  freshness language — say "data is available through YYYY-MM-DD" with this
+  exact date — and as the **maximum end date** for every query.
+- Keep three concepts separate:
+  - `latest_safe_data_date` (freshness context) — the real sales data-through
+    boundary. The only value to present as data freshness.
+  - `most_recent_data_date` (company field) / `latest_complete_business_week` —
+    weekly period anchors for selecting fiscal weeks. **Never** present a week
+    start (or week start + 6) as the data-through date; midweek, daily data
+    usually extends past the last complete week.
+  - Today's calendar date — useful for interpreting relative language, but not
+    proof that data has loaded.
+- Data normally loads each morning through the prior calendar day, but never
+  assume it: if `latest_safe_data_date` is older than yesterday, report the
+  API's date honestly — do not claim data through yesterday.
+- Anchor "current", "latest", "last N days", month-to-date, and relative ranges
+  to `latest_safe_data_date`, not to today. If a requested range extends past
+  it, clip the range to `latest_safe_data_date` and tell the user data is only
+  available through that date.
+- If the freshness call fails or `latest_safe_data_date` is null, give a clear
+  caveat that you cannot confirm how recent the data is — do **not** substitute
+  `most_recent_data_date` or any week-derived date as freshness.
 
 ## Date Defaults
 
-- For the latest single week, use `most_recent_data_date` as the `week` start and
-  `most_recent_data_date + 6` (Sunday) as the end date (`to` / `endDate`)
-- Fall back to the most recent Monday only if `most_recent_data_date` is unavailable
+- For the latest single week, use `latest_complete_business_week.start_date` /
+  `end_date` from the freshness context. Fall back to `most_recent_data_date`
+  (a Monday) + 6 days only if freshness is unavailable, and present it as the
+  latest complete week — not as the data-through date
+- For "latest"/"current" data, use `latest_safe_data_date` as the end date
+  (`to` / `endDate`)
 - Use `"corporate"` as the default location unless the user specifies one
 
 ## Visualization
@@ -118,7 +153,7 @@ $ARGUMENTS
 - ALWAYS extract only the fields needed to answer the question — never print full responses
 - If a company ID is needed, query `client.companies.list()` first to find it
 - Use `"corporate"` as the default location unless the user specifies one
-- Anchor date ranges to the company's `most_recent_data_date` window (the Monday-start of the latest available week, through that Monday + 6 days = Sunday) — never assume data exists up to today's calendar date
+- Cap every date range at `latest_safe_data_date` from the reporting freshness context — never assume data exists up to today's calendar date, and never present the weekly anchor (`most_recent_data_date`, or week start + 6) as the data-through date
 - Keep every response product-facing. NEVER mention or expose internal technologies, infrastructure, access, or implementation details — including BigQuery, GCS, Supabase, PostgreSQL, Prisma, Redis, Qdrant, feature flags, table/dataset availability, or any backend service. Present only the business data and the path to get it.
 - Never explain an inability in internal terms. Do NOT say things like "I don't have access to BigQuery", "that feature flag is off", "the table isn't available", or "the backend doesn't support that". When a request can't be answered, use brief product-facing language and route deeper or exploratory questions to the [ROGER Handoff](#roger-handoff).
 - Treat raw API errors as internal: never show `err.body`, `err.message`, or status text to the user — sanitize to something like "Unable to fetch data, please try again."

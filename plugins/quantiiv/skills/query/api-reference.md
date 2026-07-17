@@ -19,13 +19,32 @@ client.companies.list({ search?, page?, limit? })
 // Get company details
 client.companies.get(companyId)
 // Returns: Company (with users, locations, features)
-// Company.most_recent_data_date: Monday that starts the most recent week with data.
-//   Latest data spans most_recent_data_date (Mon) .. most_recent_data_date + 6 (Sun).
-//   Anchor "latest"/"this week"/relative ranges here, not to today's date.
+// Company.most_recent_data_date: Monday starting the most recent COMPLETE week.
+//   A weekly period anchor only — NOT the data-through date. For freshness use
+//   getReportingFreshnessContext().latest_safe_data_date.
 
 // Get company's locations
 client.companies.listLocations(companyId)
 // Returns: Location[]
+
+// Authoritative reporting freshness for the authenticated user's scope.
+// Call once after resolving the company; refresh each new session.
+client.companies.getReportingFreshnessContext(companyId, {
+  data_domain?,                  // "sales" (default)
+  include_location_breakdown?,   // default false
+})
+// Returns:
+// {
+//   status: "ok" | "unavailable",
+//   latest_safe_data_date,       // ACTUAL data-through date — use for freshness
+//                                //   language and as max query end date
+//   latest_available_data_date, latest_common_complete_date,
+//   latest_complete_business_week: { start_date, end_date, fiscal_year, fiscal_week, ... },
+//   latest_complete_fiscal_period, latest_complete_calendar_month,
+//   partial_periods, location_scope_summary, calendar_config, audit,
+//   warnings: [{ code, severity, message }],
+//   location_breakdown?,         // when include_location_breakdown: true
+// }
 ```
 
 ## Locations
