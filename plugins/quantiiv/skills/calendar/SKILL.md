@@ -2,15 +2,16 @@
 name: calendar
 description: |
   The Quantiiv BUSINESS calendar — a restaurant company's record of dated operational events
-  that give context to store performance. Use when the user asks about, or wants to record, a
-  business or store event: promotion, promo, LTO, limited time offer, BOGO, closure, closed for
-  remodel, grand opening, store event, observed holiday. Examples: "what promos ran in June",
+  that give context to store performance. Use when the user asks about, or wants to record, any
+  dated thing that happened to the business — these are common cases, not the whole set:
+  promotion, promo, LTO, limited time offer, BOGO, closure, closed for remodel, grand opening,
+  inspection, training day, store event, observed holiday. Examples: "what promos ran in June",
   "was there a promo on the 14th", "is the store closed on the 4th", "any store events next
   month", "log a BOGO for next Tuesday", "record that Midtown is closed for remodel", "archive
   that promo". Not a personal calendar: every Quantiiv event belongs to a company and carries a
   company-wide, corporate, per-store, or access-group scope, so this skill cannot see meetings,
-  appointments, availability, or anything in Google Calendar, Outlook, or iCal. Finds and records
-  dated business events only — for sales, labor, weather, or fiscal metrics use the `query` skill.
+  appointments, availability, or anything in Google Calendar, Outlook, or iCal. For sales, labor,
+  weather, or fiscal metrics, use the `query` skill.
 allowed-tools: Read, mcp__quantiiv__list-companies, mcp__quantiiv__list-calendar-events,
   mcp__quantiiv__get-calendar-event,
   mcp__quantiiv__list-calendar-facets, mcp__quantiiv__list-calendar-categories,
@@ -26,8 +27,10 @@ argument-hint: <question about the Quantiiv business calendar, or a store event 
 Find and record the dated operational events — promotions, closures, remodels, grand openings,
 observed holidays — that give context to store performance. This skill orchestrates typed MCP
 tools; it never constructs a request by hand. For sales, labor, weather, or fiscal metrics, use the `query`
-skill instead. When a question needs both ("did the BOGO lift sales?"), resolve the event's dates
-here first, then get the metrics from `query`.
+skill instead. When a question needs both ("what was running the week sales dropped?"), resolve the
+event's dates here first, then get the metrics from `query` — and hand back both, never a verdict
+that one caused the other. A question phrased causally ("did the BOGO lift sales?") is still
+answered this way: the dates and the numbers, with the reading left to the operator.
 
 ## Not Your Personal Calendar
 
@@ -151,7 +154,9 @@ this file does not.**
 - `accessPolicy` is authoritative. `visibility` and `affectedLocationIds` are legacy facades —
   ignore them.
 - `source === "system:holiday"` marks a system holiday, not something the operator scheduled. Worth
-  distinguishing: "Independence Day (holiday)" vs. "BOGO Wings (your promo)".
+  distinguishing: "Independence Day (holiday)" vs. "BOGO Wings (recorded by your team)". Don't call
+  an event "yours" — the response says who can see it, never who owns it, and a manager routinely
+  sees chain events somebody else recorded.
 - `truncated: true` means the window had more recurring occurrences than could be expanded — narrow
   the window.
 - `total` counts event *series*; `data` carries expanded occurrences. Never compare them to judge

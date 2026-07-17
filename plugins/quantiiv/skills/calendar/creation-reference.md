@@ -112,10 +112,12 @@ copies for the user to find later.
 1. **Look up before you write.** Call `list-calendar-events` for the same stores and window to check
    for an existing match. Never claim an event does or doesn't exist without a lookup result. This
    is best-effort, not a guard — see above.
-2. **Amend, don't duplicate.** To change an event: look it up, then pass its `id` and
-   `expectedUpdatedAt` to `update-calendar-event`.
-3. **Never hard delete.** To remove, retire, or cancel an event: `archive-calendar-event` with `id`,
-   `expectedUpdatedAt`, and a concise reason. Hard delete isn't exposed.
+2. **Amend, don't duplicate.** To change an event: look it up, then call `update-calendar-event`
+   with `expectedUpdatedAt` and the event's `id` — **passed as `eventId`**. A lookup returns the
+   event's id in a field named `id`; every write tool takes it as `eventId`.
+3. **Never hard delete.** To remove, retire, or cancel an event: `archive-calendar-event` with
+   `eventId` (again, the `id` from the lookup), `expectedUpdatedAt`, and a concise `reason` —
+   all four are required. Hard delete isn't exposed.
 4. **Claim success only after the tool reports commit.** Never say "I've added it" before the write
    actually returns.
 5. **Report partial state exactly.** If a category commits and the event write then fails, say so
