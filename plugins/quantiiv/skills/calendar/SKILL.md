@@ -178,7 +178,11 @@ never read the raw message text to the user.
 | `credential_missing_write` | "Your Quantiiv connection is set up for reading the calendar but not for changes — run `/quantiiv:setup` to update it." |
 | `conflict_stale` | Someone changed the event since you read it. Re-read it, show the user what changed, and ask before retrying. **Never blind-retry.** |
 | `near_duplicate` | A 409 — **the write did not commit**. Not a failure to report as one: it means the name already exists in another form. See `creation-reference.md`, then file under the existing name. |
-| anything else | "I couldn't record that — want me to try again?" Offer the Console or ROGER. |
+| `internal_error` | **The outcome is unknown — the event may already exist.** Look it up before anything else. If it is there, it worked: tell the user it's recorded. Only if it is absent may you offer to try again. **Never retry first** — there is no protection against filing the same event twice. |
+| `recurrence_invalid` | The repeat rule can never land on a real date — usually a day-of-month that the chosen months don't have (a 31st in a 30-day month). Retrying it unchanged fails identically. Say which part doesn't work and ask for a rule that can land. |
+| `precondition_required`, `not_found` | You are working from a stale or wrong reference. Look the event up again and start from what you find. Retrying unchanged cannot succeed. |
+| a `holiday_*` code | This is a managed holiday, not an ordinary event — it is governed by the company's holiday settings, not by editing it here. Say it's managed centrally and point at the Console. |
+| anything else | "I couldn't record that." Offer the Console or ROGER. Do **not** offer to retry unless you have first looked the event up and confirmed it isn't there. |
 
 **Never say to the user:** "interactive user required", "developer token", "session", "sign in",
 "Firebase", "Firestore", "permission denied", "403", a code role name, or any error text verbatim.
