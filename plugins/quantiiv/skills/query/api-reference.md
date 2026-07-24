@@ -79,8 +79,11 @@ client.products.getMenuCatalog(companyId, {
 
 // NOTE: every `week` parameter below expects the FISCAL week start date — a
 // date falling on the company's fiscal_week_start_day (e.g. Tuesday), not
-// necessarily a Monday. Get it from latest_complete_business_week.start_date
-// or client.fiscalCalendar.resolveFiscalWeek().
+// necessarily a Monday. For "latest" questions use the start of the current
+// IN-PROGRESS week (the week containing latest_safe_data_date) with
+// to: latest_safe_data_date, presented as week-to-date; use
+// latest_complete_business_week.start_date only when the user explicitly asks
+// for a complete week. Resolve via client.fiscalCalendar.resolveFiscalWeek().
 
 // Weekly product overview
 client.products.getData(companyId, {
