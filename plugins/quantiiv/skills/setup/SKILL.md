@@ -1,6 +1,6 @@
 ---
 name: setup
-description: This skill should be used when the user asks to "set up Quantiiv", "configure Quantiiv", "install Quantiiv SDK", "initialize Quantiiv", "connect to Quantiiv", "add Quantiiv API key", "get started with Quantiiv", or mentions needing to configure QUANTIIV_API_KEY or Quantiiv credentials. Guides through SDK installation and credential configuration.
+description: This skill should be used when the user asks to "set up Quantiiv", "configure Quantiiv", "install Quantiiv SDK", "initialize Quantiiv", "connect to Quantiiv", "add Quantiiv API key", "get started with Quantiiv", "update the Quantiiv SDK", "upgrade the Quantiiv SDK", or mentions needing to configure QUANTIIV_API_KEY or Quantiiv credentials, or when an installed SDK is outdated (a documented SDK method is missing at runtime). Guides through SDK installation, credential configuration, and SDK updates.
 allowed-tools: Bash
 argument-hint: (no arguments needed)
 ---
@@ -81,10 +81,50 @@ If verification fails:
 - Check that the API key is valid and not expired
 - Ensure no proxy or firewall is blocking the connection
 
+## Updating the SDK
+
+Use this flow when the user asks to update/upgrade the SDK, or when the
+installed SDK is outdated — e.g. a documented method (such as
+`client.fiscalCalendar` or `client.companies.getReportingFreshnessContext`)
+is `undefined` at runtime.
+
+The API key is already stored in the session as `$QUANTIIV_API_KEY`
+(configured during setup) — do **not** ask the user for it again. If the
+variable is empty (`[ -z "$QUANTIIV_API_KEY" ]`), run the full setup above
+first.
+
+1. **Fetch a fresh registry token** — registry tokens are temporary, so the
+   one from install time has likely expired. Always refresh it before any
+   npm operation on the SDK:
+
+```bash
+# Ensure ~/.npmrc ends with a newline before appending (prevents concatenation with existing last line)
+[ -f ~/.npmrc ] && [ -n "$(tail -c 1 ~/.npmrc)" ] && echo '' >> ~/.npmrc
+curl -s -X POST https://quantiiv-api-400709292651.us-central1.run.app/sdk/registry-token \
+  -H "Authorization: Bearer $QUANTIIV_API_KEY" | jq -r '.npmrcSnippet' >> ~/.npmrc
+```
+
+2. **Update the package**:
+
+```bash
+npm install -g @quantiiv-ai/sdk@latest
+```
+
+3. **Verify the new version loads**:
+
+```bash
+NODE_PATH="$(npm root -g)" node -e "console.log('SDK version:', require('@quantiiv-ai/sdk/package.json').version)"
+```
+
+If the token fetch returns an error, or the npm install fails with 401/403,
+the stored API key may be invalid or expired — re-run the full setup to
+collect a fresh key.
+
 ## Requirements
 
 - Do not store credentials in project files or `.env` files — use Claude Code settings only
 - Never log or display the API key value to the user after configuration
-- The registry token is temporary — if the SDK needs reinstalling later, fetch a new token first
+- The registry token is temporary — before any later npm install/update of the SDK, fetch a new token first (see "Updating the SDK")
+- For updates, reuse `$QUANTIIV_API_KEY` from the session environment — never re-prompt the user for a key they already configured
 - If the SDK is already installed, skip to Step 2
 - If env vars are already configured, skip to Step 4 and verify

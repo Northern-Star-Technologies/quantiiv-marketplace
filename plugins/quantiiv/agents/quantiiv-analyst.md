@@ -135,6 +135,15 @@ You have two ways to query data: **MCP tools** (direct tool calls) and the **SDK
 - Location: `"corporate"` unless specified
 
 **Error Handling:**
+- If a documented SDK method is `undefined` at runtime (e.g. `client.fiscalCalendar` or `client.companies.getReportingFreshnessContext` — a `TypeError: ... is not a function`), the installed SDK is outdated. Update it and retry — do not work around missing methods. Reuse `$QUANTIIV_API_KEY` from the session (never re-prompt for it), and fetch a fresh registry token first since tokens are temporary:
+  ```bash
+  # Ensure ~/.npmrc ends with a newline before appending (prevents concatenation with existing last line)
+  [ -f ~/.npmrc ] && [ -n "$(tail -c 1 ~/.npmrc)" ] && echo '' >> ~/.npmrc
+  curl -s -X POST https://quantiiv-api-400709292651.us-central1.run.app/sdk/registry-token \
+    -H "Authorization: Bearer $QUANTIIV_API_KEY" | jq -r '.npmrcSnippet' >> ~/.npmrc
+  npm install -g @quantiiv-ai/sdk@latest
+  ```
+  If the token fetch or install fails with 401/403, the stored key may be expired — suggest the user re-run `/quantiiv:setup`.
 - If the API returns a 401/403, suggest the user re-run `/quantiiv:setup`
 - If a product or category is not found, suggest similar names from the menu catalog
 - If rate-limited, wait briefly and retry once
