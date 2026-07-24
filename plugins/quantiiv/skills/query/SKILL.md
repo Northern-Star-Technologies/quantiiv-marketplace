@@ -1,6 +1,6 @@
 ---
 name: query
-description: This skill should be used when the user asks about "sales data", "top sellers", "menu items", "product performance", "company locations", "menu groups", "store performance", "weekly sales summary", "weather", "rainfall", "temperature", "labor", "labor cost", "labor hours", "staffing", "scheduling", "sales per labor hour", "SPLH", "labor by job", "labor by role", "labor by position", "fiscal period", "fiscal week", "fiscal year", "fiscal calendar", "P1..P13", "FW1..FW53", "YTD", or any Quantiiv analytics metrics. Also triggered by questions like "what were my top movers", "show me sales trends", "how is this product doing", "list my companies", "compare store performance", "revenue by menu group", "daily sales for [item]", "what was the weather at [location]", "did weather affect sales", "what's my labor cost", "peak labor hours", "labor by location", "am I overstaffed at [hour]", "what's my sales per labor hour", "labor cost by role", "hours by position", "what were sales in P3", "fiscal YTD numbers", "this fiscal week", "compare to prior period". When a user references a fiscal period name (e.g. "P3 of FY2026", "fiscal Q1", "fiscal week 12"), resolve it via `client.fiscalCalendar` first to get concrete start/end dates, then pass those dates to the sales/labor/weather endpoints.
+description: This skill should be used when the user asks about "sales data", "top sellers", "menu items", "product performance", "company locations", "menu groups", "store performance", "weekly sales summary", "weather", "rainfall", "temperature", "labor", "labor cost", "labor hours", "staffing", "scheduling", "sales per labor hour", "SPLH", "labor by job", "labor by role", "labor by position", "fiscal period", "fiscal week", "fiscal year", "fiscal calendar", "P1..P13", "FW1..FW53", "YTD", or any Quantiiv analytics metrics. Also triggered by questions like "what were my top movers", "show me sales trends", "how is this product doing", "list my companies", "compare store performance", "revenue by menu group", "daily sales for [item]", "what was the weather at [location]", "did weather affect sales", "what's my labor cost", "peak labor hours", "labor by location", "am I overstaffed at [hour]", "what's my sales per labor hour", "labor cost by role", "hours by position", "what were sales in P3", "fiscal YTD numbers", "this fiscal week", "compare to prior period". When a user references a fiscal period name (e.g. "P3 of FY2026", "fiscal Q1", "fiscal week 12"), resolve it via `client.fiscalCalendar` first to get concrete start/end dates, then pass those dates to the sales/labor/weather endpoints. For "latest"/"current" data, anchor to the daily-updated `latest_safe_data_date` from the reporting freshness context — not to the latest week start. For "this week"/"last week" or any weekly range, align week boundaries to the company's fiscal week start day (`calendar_config.week_start_day`, e.g. Tuesday) — never assume Monday.
 allowed-tools: Bash
 argument-hint: <question about your business data>
 ---
@@ -63,6 +63,8 @@ const client = new QuantiivClient({ token: process.env.QUANTIIV_API_KEY });
       status: f.status,
       latest_safe_data_date: f.latest_safe_data_date,
       latest_complete_business_week: f.latest_complete_business_week,
+      week_start_day: f.calendar_config?.week_start_day,
+      week_end_day: f.calendar_config?.week_end_day,
       warnings: f.warnings.map((w) => w.message),
     }));
   } catch (err) {
@@ -98,14 +100,34 @@ locations, so a location-scoped user automatically gets their own freshness.
   caveat that you cannot confirm how recent the data is — do **not** substitute
   `most_recent_data_date` or any week-derived date as freshness.
 
+## Fiscal Week Alignment
+
+Each company defines its own fiscal week start day — e.g.
+`fiscal_week_start_day: "Tuesday"` means weeks run Tuesday → Monday. **Never**
+assume Monday–Sunday, Sunday–Saturday, or ISO/calendar weeks.
+
+- The authoritative value is `calendar_config.week_start_day` /
+  `week_end_day` from the reporting freshness context fetched above.
+- For "this week", "last week", or week-over-week questions, use
+  `latest_complete_business_week.start_date` / `end_date` from the freshness
+  context, or resolve via `client.fiscalCalendar.resolveFiscalWeek` — both
+  already respect the company's configured week start day.
+- When constructing any weekly range by hand (e.g. "the week of July 10"),
+  align its start to the company's `week_start_day`, not to Monday.
+- Endpoints that take a `week` parameter expect the **fiscal week start
+  date** — a date falling on the company's `week_start_day`, which is not
+  necessarily a Monday.
+
 ## Date Defaults
 
 - For the latest single week, use `latest_complete_business_week.start_date` /
   `end_date` from the freshness context. Fall back to `most_recent_data_date`
-  (a Monday) + 6 days only if freshness is unavailable, and present it as the
-  latest complete week — not as the data-through date
+  (the first day of the company's fiscal week) + 6 days only if freshness is
+  unavailable, and present it as the latest complete week — not as the
+  data-through date
 - For "latest"/"current" data, use `latest_safe_data_date` as the end date
-  (`to` / `endDate`)
+  (`to` / `endDate`) — data loads daily, so the latest data usually extends
+  past the last complete week
 - Use `"corporate"` as the default location unless the user specifies one
 
 ## Visualization
@@ -154,6 +176,7 @@ $ARGUMENTS
 - If a company ID is needed, query `client.companies.list()` first to find it
 - Use `"corporate"` as the default location unless the user specifies one
 - Cap every date range at `latest_safe_data_date` from the reporting freshness context — never assume data exists up to today's calendar date, and never present the weekly anchor (`most_recent_data_date`, or week start + 6) as the data-through date
+- Align every weekly boundary to the company's fiscal week start day (`calendar_config.week_start_day` from the freshness context) — never assume weeks start on Monday
 - Keep every response product-facing. NEVER mention or expose internal technologies, infrastructure, access, or implementation details — including BigQuery, GCS, Supabase, PostgreSQL, Prisma, Redis, Qdrant, feature flags, table/dataset availability, or any backend service. Present only the business data and the path to get it.
 - Never explain an inability in internal terms. Do NOT say things like "I don't have access to BigQuery", "that feature flag is off", "the table isn't available", or "the backend doesn't support that". When a request can't be answered, use brief product-facing language and route deeper or exploratory questions to the [ROGER Handoff](#roger-handoff).
 - Treat raw API errors as internal: never show `err.body`, `err.message`, or status text to the user — sanitize to something like "Unable to fetch data, please try again."

@@ -19,8 +19,10 @@ client.companies.list({ search?, page?, limit? })
 // Get company details
 client.companies.get(companyId)
 // Returns: Company (with users, locations, features)
-// Company.most_recent_data_date: Monday starting the most recent COMPLETE week.
-//   A weekly period anchor only — NOT the data-through date. For freshness use
+// Company.most_recent_data_date: start of the most recent COMPLETE fiscal week.
+//   Falls on the company's fiscal week start day (fiscal_week_start_day, e.g.
+//   "Tuesday") — NOT necessarily a Monday. A weekly period anchor only — NOT
+//   the data-through date. For freshness use
 //   getReportingFreshnessContext().latest_safe_data_date.
 
 // Get company's locations
@@ -41,7 +43,12 @@ client.companies.getReportingFreshnessContext(companyId, {
 //   latest_available_data_date, latest_common_complete_date,
 //   latest_complete_business_week: { start_date, end_date, fiscal_year, fiscal_week, ... },
 //   latest_complete_fiscal_period, latest_complete_calendar_month,
-//   partial_periods, location_scope_summary, calendar_config, audit,
+//   partial_periods, location_scope_summary,
+//   calendar_config: { week_start_day, week_end_day, calendar_type, ... },
+//                                // week_start_day (e.g. "Tuesday") defines the
+//                                //   fiscal week boundary — align all weekly
+//                                //   ranges to it, never assume Monday
+//   audit,
 //   warnings: [{ code, severity, message }],
 //   location_breakdown?,         // when include_location_breakdown: true
 // }
@@ -70,9 +77,14 @@ client.products.getMenuCatalog(companyId, {
 })
 // Returns: { menu_groups: string[], items: [{menu_group, menu_item}], pagination }
 
+// NOTE: every `week` parameter below expects the FISCAL week start date — a
+// date falling on the company's fiscal_week_start_day (e.g. Tuesday), not
+// necessarily a Monday. Get it from latest_complete_business_week.start_date
+// or client.fiscalCalendar.resolveFiscalWeek().
+
 // Weekly product overview
 client.products.getData(companyId, {
-  week: "YYYY-MM-DD",       // required (week start date)
+  week: "YYYY-MM-DD",       // required (fiscal week start date)
   location: "corporate",     // required
   to: "YYYY-MM-DD",         // required (end date)
   menuGroup?,                // optional filter
