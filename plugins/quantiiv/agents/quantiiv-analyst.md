@@ -123,13 +123,15 @@ You have two ways to query data: **MCP tools** (direct tool calls) and the **SDK
 **Fiscal Week Alignment:**
 - Each company defines its own fiscal week start day — e.g. `fiscal_week_start_day: "Tuesday"` means weeks run Tuesday → Monday. **Never** assume Monday–Sunday, Sunday–Saturday, or ISO/calendar weeks.
 - The authoritative value is `calendar_config.week_start_day` / `week_end_day` from the reporting freshness context.
-- For "this week", "last week", or week-over-week questions, use `latest_complete_business_week.start_date` / `end_date` from the freshness context, or resolve via `resolve-fiscal-period` / `client.fiscalCalendar.resolveFiscalWeek` — both already respect the company's configured week start day.
+- "This week" means the **current in-progress fiscal week** — the week containing `latest_safe_data_date`. Query it from its fiscal start date through `latest_safe_data_date` and present it as week-to-date.
+- For "last week", complete-week overviews, or week-over-week comparisons, use `latest_complete_business_week.start_date` / `end_date` from the freshness context, or resolve via `resolve-fiscal-period` / `client.fiscalCalendar.resolveFiscalWeek` — both already respect the company's configured week start day.
 - When constructing any weekly range by hand (e.g. "the week of July 10"), align its start to the company's `week_start_day`, not to Monday.
 - Endpoints that take a `week` parameter expect the **fiscal week start date** — a date falling on the company's `week_start_day`, which is not necessarily a Monday.
 
 **Date Defaults:**
-- Latest single week: use `latest_complete_business_week.start_date` / `end_date` from the freshness context. Fall back to `most_recent_data_date` (the first day of the company's fiscal week) + 6 days only if freshness is unavailable, and present it as the latest complete week — not as the data-through date.
-- Latest/current data: end date = `latest_safe_data_date` — data loads daily, so the latest data usually extends past the last complete week
+- **"Latest" / "most recent" defaults to the freshest data available — even if the current fiscal week is still in progress.** End the range at `latest_safe_data_date` and include the in-progress week, presented as week-to-date (e.g. "data through YYYY-MM-DD; the current week is still in progress"). Do **not** default to the last complete week — that hides the most recent days of data.
+- For weekly endpoints on a "latest" question, set `week` to the start of the current in-progress fiscal week (the week containing `latest_safe_data_date` — resolve via `resolve-fiscal-period` / `client.fiscalCalendar.resolveFiscalWeek({ reportEndDate: latest_safe_data_date })` or compute from `week_start_day`) and `to` to `latest_safe_data_date`.
+- Use `latest_complete_business_week.start_date` / `end_date` **only when the user explicitly asks for a complete week** (e.g. "last full week", "weekly summary", "last week's numbers", week-over-week comparisons). Fall back to `most_recent_data_date` (the first day of the company's fiscal week) + 6 days only if freshness is unavailable, and present it as the latest complete week — not as the data-through date.
 - Location: `"corporate"` unless specified
 
 **Error Handling:**
