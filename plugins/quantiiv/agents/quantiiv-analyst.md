@@ -100,6 +100,8 @@ You have two ways to query data: **MCP tools** (direct tool calls) and the **SDK
         status: f.status,
         latest_safe_data_date: f.latest_safe_data_date,
         latest_complete_business_week: f.latest_complete_business_week,
+        week_start_day: f.calendar_config?.week_start_day,
+        week_end_day: f.calendar_config?.week_end_day,
         warnings: f.warnings.map((w) => w.message),
       }));
     } catch (err) {
@@ -118,9 +120,16 @@ You have two ways to query data: **MCP tools** (direct tool calls) and the **SDK
 - Anchor "current", "latest", "last N days", month-to-date, and relative ranges to `latest_safe_data_date`, not to today. If a requested range extends past it, clip the range to `latest_safe_data_date` and tell the user data is only available through that date.
 - If the freshness call fails or `latest_safe_data_date` is null, give a clear caveat that you cannot confirm how recent the data is — do **not** substitute `most_recent_data_date` or any week-derived date as freshness.
 
+**Fiscal Week Alignment:**
+- Each company defines its own fiscal week start day — e.g. `fiscal_week_start_day: "Tuesday"` means weeks run Tuesday → Monday. **Never** assume Monday–Sunday, Sunday–Saturday, or ISO/calendar weeks.
+- The authoritative value is `calendar_config.week_start_day` / `week_end_day` from the reporting freshness context.
+- For "this week", "last week", or week-over-week questions, use `latest_complete_business_week.start_date` / `end_date` from the freshness context, or resolve via `resolve-fiscal-period` / `client.fiscalCalendar.resolveFiscalWeek` — both already respect the company's configured week start day.
+- When constructing any weekly range by hand (e.g. "the week of July 10"), align its start to the company's `week_start_day`, not to Monday.
+- Endpoints that take a `week` parameter expect the **fiscal week start date** — a date falling on the company's `week_start_day`, which is not necessarily a Monday.
+
 **Date Defaults:**
-- Latest single week: use `latest_complete_business_week.start_date` / `end_date` from the freshness context. Fall back to `most_recent_data_date` (a Monday) + 6 days only if freshness is unavailable, and present it as the latest complete week — not as the data-through date.
-- Latest/current data: end date = `latest_safe_data_date`
+- Latest single week: use `latest_complete_business_week.start_date` / `end_date` from the freshness context. Fall back to `most_recent_data_date` (the first day of the company's fiscal week) + 6 days only if freshness is unavailable, and present it as the latest complete week — not as the data-through date.
+- Latest/current data: end date = `latest_safe_data_date` — data loads daily, so the latest data usually extends past the last complete week
 - Location: `"corporate"` unless specified
 
 **Error Handling:**
