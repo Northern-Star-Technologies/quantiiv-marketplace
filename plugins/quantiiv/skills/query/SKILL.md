@@ -32,6 +32,26 @@ NODE_PATH="$(npm root -g)" node -e "require('@quantiiv-ai/sdk')" 2>/dev/null || 
 
 If not installed, prompt the user to run `/quantiiv:setup` first.
 
+### Outdated SDK
+
+If a documented method is `undefined` at runtime (e.g. `client.fiscalCalendar`
+or `client.companies.getReportingFreshnessContext` — a `TypeError: ... is not
+a function`), the installed SDK is outdated. Update it before answering — do
+not work around missing methods. The API key is already in the session as
+`$QUANTIIV_API_KEY`; never re-prompt for it. Registry tokens are temporary, so
+fetch a fresh one first:
+
+```bash
+# Ensure ~/.npmrc ends with a newline before appending (prevents concatenation with existing last line)
+[ -f ~/.npmrc ] && [ -n "$(tail -c 1 ~/.npmrc)" ] && echo '' >> ~/.npmrc
+curl -s -X POST https://quantiiv-api-400709292651.us-central1.run.app/sdk/registry-token \
+  -H "Authorization: Bearer $QUANTIIV_API_KEY" | jq -r '.npmrcSnippet' >> ~/.npmrc
+npm install -g @quantiiv-ai/sdk@latest
+```
+
+Then retry the query. If the token fetch or install fails with 401/403, the
+stored key may be expired — route the user to `/quantiiv:setup`.
+
 ## How to Query
 
 Write a Node.js script and execute it via Bash. Always include error handling and use `NODE_PATH`:
