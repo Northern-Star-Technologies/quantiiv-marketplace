@@ -122,20 +122,23 @@ locations, so a location-scoped user automatically gets their own freshness.
 
 ### Freshness Sanity Checks
 
-Before stating a data-through date, confirm all three. If any fails, the date in
+Before stating a data-through date, confirm both. If either fails, the date in
 hand is a weekly period anchor, not freshness:
 
-- It came from `latest_safe_data_date` in a freshness context fetched **this
-  session**. No other field is freshness. Never attribute a data-through date to
-  the company record, the company object, or a fiscal week.
-- It does **not** fall on the company's `week_start_day`, and does not equal
-  `latest_complete_business_week.start_date`. A "freshness" date landing exactly
-  on a fiscal week start is almost always `most_recent_data_date` misread as
-  freshness — re-fetch instead of reporting it.
-- It is not earlier than the end of any complete week you are about to report. If
-  you are presenting a full week ending YYYY-MM-DD, freshness cannot precede that
-  date; that contradiction means the freshness value is wrong, not that the week
-  is unreliable.
+- **Provenance** — it came from `latest_safe_data_date` in a freshness context
+  fetched **this session**. No other field is freshness. Never attribute a
+  data-through date to the company record, the company object, or a fiscal week.
+- **Consistency** — it is not earlier than the end of any complete week you are
+  about to report, and it does not equal or fall before
+  `latest_complete_business_week.start_date`. A complete week's data runs through
+  its `end_date`, so a data-through date at or before that week's *start* is a
+  contradiction — the freshness value is wrong, not the week.
+
+A genuine `latest_safe_data_date` **can** land on the company's `week_start_day`:
+that is just data loaded through the first day of a new fiscal week, and it is
+correct. Falling on a week start is not by itself evidence of a mix-up — do not
+second-guess or re-fetch a freshness date for that reason alone. Provenance and
+the complete-week comparison are what separate freshness from an anchor.
 
 ### When the SDK Is Unavailable
 
