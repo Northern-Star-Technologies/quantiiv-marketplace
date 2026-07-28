@@ -119,41 +119,14 @@ locations, so a location-scoped user automatically gets their own freshness.
 - If the freshness call fails or `latest_safe_data_date` is null, give a clear
   caveat that you cannot confirm how recent the data is — do **not** substitute
   `most_recent_data_date` or any week-derived date as freshness.
-
-### Freshness Sanity Checks
-
-Before stating a data-through date, confirm both. If either fails, the date in
-hand is a weekly period anchor, not freshness:
-
-- **Provenance** — it came from `latest_safe_data_date` in a freshness context
-  fetched **this session**. No other field is freshness. Never attribute a
-  data-through date to the company record, the company object, or a fiscal week.
-- **Consistency** — it is not earlier than the end of any complete week you are
-  about to report, and it does not equal or fall before
-  `latest_complete_business_week.start_date`. A complete week's data runs through
-  its `end_date`, so a data-through date at or before that week's *start* is a
-  contradiction — the freshness value is wrong, not the week.
-
-A genuine `latest_safe_data_date` **can** land on the company's `week_start_day`:
-that is just data loaded through the first day of a new fiscal week, and it is
-correct. Falling on a week start is not by itself evidence of a mix-up — do not
-second-guess or re-fetch a freshness date for that reason alone. Provenance and
-the complete-week comparison are what separate freshness from an anchor.
-
-### When the SDK Is Unavailable
-
-`getReportingFreshnessContext` is SDK-only — there is no MCP tool for it. In a
-session that has the Quantiiv MCP tools but no Bash/SDK access, freshness still
-must not come from `get-company`'s `most_recent_data_date`. Instead:
-
-1. Probe for daily data past the last complete week: pick a high-volume item and
-   call `get-item-sales` from the day after
-   `latest_complete_business_week.end_date` (or `most_recent_data_date` + 7)
-   through today. The latest date returning sales is a best-effort data-through
-   date — present it as "data appears to run through YYYY-MM-DD".
-2. If the probe returns no rows, report the last complete week as what you can
-   confirm and say plainly that you cannot confirm how recent daily data is.
-   Never name a week-start date as the data-through date.
+- **The data-through date is `latest_safe_data_date`, and nothing else ever is.**
+  Not `most_recent_data_date`, not a company-record field, not a fiscal week's
+  start or end, not today's date. This context is SDK-only — there is no MCP tool
+  for it — so in a session without SDK access you simply do not have a
+  data-through date: say you cannot confirm how recent the data is rather than
+  reaching for the weekly anchor.
+- State it plainly and separately from whatever period you are reporting, e.g.
+  "FW30 (July 20–26); data runs through July 27."
 
 ## Fiscal Week Alignment
 
@@ -244,7 +217,7 @@ $ARGUMENTS
 - If a company ID is needed, query `client.companies.list()` first to find it
 - Use `"corporate"` as the default location unless the user specifies one
 - Cap every date range at `latest_safe_data_date` from the reporting freshness context — never assume data exists up to today's calendar date, and never present the weekly anchor (`most_recent_data_date`, or week start + 6) as the data-through date
-- Run the [Freshness Sanity Checks](#freshness-sanity-checks) before stating any data-through date, and never say a freshness date came from the company record
+- State the data-through date plainly, separately from the period being reported ("FW30 (July 20–26); data runs through July 27"), and only ever from `latest_safe_data_date`
 - Align every weekly boundary to the company's fiscal week start day (`calendar_config.week_start_day` from the freshness context) — never assume weeks start on Monday
 - For "latest"/"most recent" questions, always deliver data through `latest_safe_data_date` — including the in-progress fiscal week as week-to-date. Never answer a "latest" question with only the last complete week unless the user explicitly asked for a complete-week overview
 - Keep every response product-facing. NEVER mention or expose internal technologies, infrastructure, access, or implementation details — including BigQuery, GCS, Supabase, PostgreSQL, Prisma, Redis, Qdrant, feature flags, table/dataset availability, or any backend service. Present only the business data and the path to get it.

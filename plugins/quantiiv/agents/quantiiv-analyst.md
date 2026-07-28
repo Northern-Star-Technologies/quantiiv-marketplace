@@ -119,15 +119,8 @@ You have two ways to query data: **MCP tools** (direct tool calls) and the **SDK
 - Data normally loads each morning through the prior calendar day, but never assume it: if `latest_safe_data_date` is older than yesterday, report the API's date honestly — do not claim data through yesterday.
 - Anchor "current", "latest", "last N days", month-to-date, and relative ranges to `latest_safe_data_date`, not to today. If a requested range extends past it, clip the range to `latest_safe_data_date` and tell the user data is only available through that date.
 - If the freshness call fails or `latest_safe_data_date` is null, give a clear caveat that you cannot confirm how recent the data is — do **not** substitute `most_recent_data_date` or any week-derived date as freshness.
-
-**Freshness Sanity Checks** — before stating a data-through date, confirm both. If either fails, the date in hand is a weekly period anchor, not freshness:
-- **Provenance** — it came from `latest_safe_data_date` in a freshness context fetched **this session**. No other field is freshness. Never attribute a data-through date to the company record, the company object, or a fiscal week.
-- **Consistency** — it is not earlier than the end of any complete week you are about to report, and it does not equal or fall before `latest_complete_business_week.start_date`. A complete week's data runs through its `end_date`, so a data-through date at or before that week's *start* is a contradiction — the freshness value is wrong, not the week.
-- A genuine `latest_safe_data_date` **can** land on the company's `week_start_day` — that is just data loaded through the first day of a new fiscal week, and it is correct. Falling on a week start is not by itself evidence of a mix-up; do not second-guess or re-fetch a freshness date for that reason alone.
-
-**When the SDK is unavailable** — `getReportingFreshnessContext` is SDK-only; there is no MCP tool for it. If Bash/SDK access is unavailable in this session, freshness still must not come from `get-company`'s `most_recent_data_date`:
-1. Probe for daily data past the last complete week — pick a high-volume item and call `get-item-sales` from the day after `latest_complete_business_week.end_date` (or `most_recent_data_date` + 7) through today. The latest date returning sales is a best-effort data-through date; present it as "data appears to run through YYYY-MM-DD".
-2. If the probe returns no rows, report the last complete week as what you can confirm and say plainly that you cannot confirm how recent daily data is. Never name a week-start date as the data-through date.
+- **The data-through date is `latest_safe_data_date`, and nothing else ever is.** Not `most_recent_data_date`, not a company-record field, not a fiscal week's start or end, not today's date. This context is SDK-only — there is no MCP tool for it — so in a session without SDK access you simply do not have a data-through date: say you cannot confirm how recent the data is rather than reaching for the weekly anchor.
+- State it plainly and separately from whatever period you are reporting, e.g. "FW30 (July 20–26); data runs through July 27."
 
 **Fiscal Week Alignment:**
 - Each company defines its own fiscal week start day — e.g. `fiscal_week_start_day: "Tuesday"` means weeks run Tuesday → Monday. **Never** assume Monday–Sunday, Sunday–Saturday, or ISO/calendar weeks.
