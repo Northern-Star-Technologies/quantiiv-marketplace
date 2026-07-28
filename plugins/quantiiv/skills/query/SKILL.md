@@ -1,6 +1,6 @@
 ---
 name: query
-description: This skill should be used when the user asks about "sales data", "top sellers", "menu items", "product performance", "company locations", "menu groups", "store performance", "weekly sales summary", "weather", "rainfall", "temperature", "labor", "labor cost", "labor hours", "staffing", "scheduling", "sales per labor hour", "SPLH", "labor by job", "labor by role", "labor by position", "fiscal period", "fiscal week", "fiscal year", "fiscal calendar", "P1..P13", "FW1..FW53", "YTD", or any Quantiiv analytics metrics. Also triggered by questions like "what were my top movers", "show me sales trends", "how is this product doing", "list my companies", "compare store performance", "revenue by menu group", "daily sales for [item]", "what was the weather at [location]", "did weather affect sales", "what's my labor cost", "peak labor hours", "labor by location", "am I overstaffed at [hour]", "what's my sales per labor hour", "labor cost by role", "hours by position", "what were sales in P3", "fiscal YTD numbers", "this fiscal week", "compare to prior period". When a user references a fiscal period name (e.g. "P3 of FY2026", "fiscal Q1", "fiscal week 12"), resolve it via `client.fiscalCalendar` first to get concrete start/end dates, then pass those dates to the sales/labor/weather endpoints. For "latest"/"current" data, anchor to the daily-updated `latest_safe_data_date` from the reporting freshness context — not to the latest week start — and include the current in-progress fiscal week as week-to-date; only default to the last complete week when the user explicitly asks for a complete-week overview. For "this week"/"last week" or any weekly range, align week boundaries to the company's fiscal week start day (`calendar_config.week_start_day`, e.g. Tuesday) — never assume Monday.
+description: This skill should be used when the user asks about "sales data", "top sellers", "menu items", "product performance", "company locations", "menu groups", "store performance", "weekly sales summary", "weather", "rainfall", "temperature", "labor", "labor cost", "labor hours", "staffing", "scheduling", "sales per labor hour", "SPLH", "labor by job", "labor by role", "labor by position", "fiscal period", "fiscal week", "fiscal year", "fiscal calendar", "P1..P13", "FW1..FW53", "YTD", or any Quantiiv analytics metrics. Also triggered by questions like "what were my top movers", "show me sales trends", "how is this product doing", "list my companies", "compare store performance", "revenue by menu group", "daily sales for [item]", "what was the weather at [location]", "did weather affect sales", "what's my labor cost", "peak labor hours", "labor by location", "am I overstaffed at [hour]", "what's my sales per labor hour", "labor cost by role", "hours by position", "what were sales in P3", "fiscal YTD numbers", "this fiscal week", "compare to prior period". When a user references a fiscal period name (e.g. "P3 of FY2026", "fiscal Q1", "fiscal week 12"), resolve it via `client.fiscalCalendar` first to get concrete start/end dates, then pass those dates to the sales/labor/weather endpoints. For "latest"/"current" data, anchor to the daily-updated `latest_available_data_date` from the reporting freshness context — not to the latest week start — and include the current in-progress fiscal week as week-to-date; only default to the last complete week when the user explicitly asks for a complete-week overview. For "this week"/"last week" or any weekly range, align week boundaries to the company's fiscal week start day (`calendar_config.week_start_day`, e.g. Tuesday) — never assume Monday.
 allowed-tools: Bash
 argument-hint: <question about your business data>
 ---
@@ -81,7 +81,8 @@ const client = new QuantiivClient({ token: process.env.QUANTIIV_API_KEY });
     const f = await client.companies.getReportingFreshnessContext("<companyId>");
     console.log(JSON.stringify({
       status: f.status,
-      latest_safe_data_date: f.latest_safe_data_date,
+      latest_available_data_date: f.latest_available_data_date,
+      latest_common_complete_date: f.latest_common_complete_date,
       latest_complete_business_week: f.latest_complete_business_week,
       week_start_day: f.calendar_config?.week_start_day,
       week_end_day: f.calendar_config?.week_end_day,
@@ -97,12 +98,19 @@ const client = new QuantiivClient({ token: process.env.QUANTIIV_API_KEY });
 The endpoint is scoped to the authenticated user's company and managed
 locations, so a location-scoped user automatically gets their own freshness.
 
-- `latest_safe_data_date` is the **actual data-through date**. Use it for all
+- `latest_available_data_date` is the **actual data-through date**. Use it for all
   freshness language — say "data is available through YYYY-MM-DD" with this
   exact date — and as the **maximum end date** for every query.
-- Keep three concepts separate:
-  - `latest_safe_data_date` (freshness context) — the real sales data-through
-    boundary. The only value to present as data freshness.
+- Keep these concepts separate:
+  - `latest_available_data_date` (freshness context) — the newest loaded sales
+    date across locations. The freshness anchor: the only value to present as
+    data freshness and the end date for "latest" queries.
+  - `latest_common_complete_date` / `latest_safe_data_date` (freshness
+    context) — the newest date **all** locations are complete through. Not the
+    freshness anchor. If it trails `latest_available_data_date`, some
+    locations are still catching up — mention that briefly when presenting
+    chain-wide totals for those trailing days (check `warnings` /
+    `location_scope_summary` for details).
   - `most_recent_data_date` (company field) / `latest_complete_business_week` —
     weekly period anchors for selecting fiscal weeks. **Never** present a week
     start (or week start + 6) as the data-through date; midweek, daily data
@@ -110,13 +118,13 @@ locations, so a location-scoped user automatically gets their own freshness.
   - Today's calendar date — useful for interpreting relative language, but not
     proof that data has loaded.
 - Data normally loads each morning through the prior calendar day, but never
-  assume it: if `latest_safe_data_date` is older than yesterday, report the
+  assume it: if `latest_available_data_date` is older than yesterday, report the
   API's date honestly — do not claim data through yesterday.
 - Anchor "current", "latest", "last N days", month-to-date, and relative ranges
-  to `latest_safe_data_date`, not to today. If a requested range extends past
-  it, clip the range to `latest_safe_data_date` and tell the user data is only
+  to `latest_available_data_date`, not to today. If a requested range extends past
+  it, clip the range to `latest_available_data_date` and tell the user data is only
   available through that date.
-- If the freshness call fails or `latest_safe_data_date` is null, give a clear
+- If the freshness call fails or `latest_available_data_date` is null, give a clear
   caveat that you cannot confirm how recent the data is — do **not** substitute
   `most_recent_data_date` or any week-derived date as freshness.
 
@@ -129,8 +137,8 @@ assume Monday–Sunday, Sunday–Saturday, or ISO/calendar weeks.
 - The authoritative value is `calendar_config.week_start_day` /
   `week_end_day` from the reporting freshness context fetched above.
 - "This week" means the **current in-progress fiscal week** — the week
-  containing `latest_safe_data_date`. Query it from its fiscal start date
-  through `latest_safe_data_date` and present it as week-to-date.
+  containing `latest_available_data_date`. Query it from its fiscal start date
+  through `latest_available_data_date` and present it as week-to-date.
 - For "last week", complete-week overviews, or week-over-week comparisons, use
   `latest_complete_business_week.start_date` / `end_date` from the freshness
   context, or resolve via `client.fiscalCalendar.resolveFiscalWeek` — both
@@ -145,16 +153,16 @@ assume Monday–Sunday, Sunday–Saturday, or ISO/calendar weeks.
 
 - **"Latest" / "most recent" defaults to the freshest data available — even if
   the current fiscal week is still in progress.** End the range at
-  `latest_safe_data_date` and include the in-progress week, presented as
+  `latest_available_data_date` and include the in-progress week, presented as
   week-to-date (e.g. "data through YYYY-MM-DD; the current week is still in
   progress"). Do **not** default to the last complete week — falling back to
   `latest_complete_business_week` for a "latest sales" question hides the most
   recent days of data.
 - For weekly endpoints on a "latest" question, set `week` to the start of the
   **current in-progress fiscal week** (the week containing
-  `latest_safe_data_date` — resolve via
-  `client.fiscalCalendar.resolveFiscalWeek({ reportEndDate: latest_safe_data_date })`
-  or compute from `week_start_day`) and `to` to `latest_safe_data_date`.
+  `latest_available_data_date` — resolve via
+  `client.fiscalCalendar.resolveFiscalWeek({ reportEndDate: latest_available_data_date })`
+  or compute from `week_start_day`) and `to` to `latest_available_data_date`.
 - Use `latest_complete_business_week.start_date` / `end_date` **only when the
   user explicitly asks for a complete week** (e.g. "last full week", "weekly
   summary", "last week's numbers", week-over-week comparisons). Fall back to
@@ -208,9 +216,9 @@ $ARGUMENTS
 - ALWAYS extract only the fields needed to answer the question — never print full responses
 - If a company ID is needed, query `client.companies.list()` first to find it
 - Use `"corporate"` as the default location unless the user specifies one
-- Cap every date range at `latest_safe_data_date` from the reporting freshness context — never assume data exists up to today's calendar date, and never present the weekly anchor (`most_recent_data_date`, or week start + 6) as the data-through date
+- Cap every date range at `latest_available_data_date` from the reporting freshness context — never assume data exists up to today's calendar date, and never present the weekly anchor (`most_recent_data_date`, or week start + 6) as the data-through date
 - Align every weekly boundary to the company's fiscal week start day (`calendar_config.week_start_day` from the freshness context) — never assume weeks start on Monday
-- For "latest"/"most recent" questions, always deliver data through `latest_safe_data_date` — including the in-progress fiscal week as week-to-date. Never answer a "latest" question with only the last complete week unless the user explicitly asked for a complete-week overview
+- For "latest"/"most recent" questions, always deliver data through `latest_available_data_date` — including the in-progress fiscal week as week-to-date. Never answer a "latest" question with only the last complete week unless the user explicitly asked for a complete-week overview
 - Keep every response product-facing. NEVER mention or expose internal technologies, infrastructure, access, or implementation details — including BigQuery, GCS, Supabase, PostgreSQL, Prisma, Redis, Qdrant, feature flags, table/dataset availability, or any backend service. Present only the business data and the path to get it.
 - Never explain an inability in internal terms. Do NOT say things like "I don't have access to BigQuery", "that feature flag is off", "the table isn't available", or "the backend doesn't support that". When a request can't be answered, use brief product-facing language and route deeper or exploratory questions to the [ROGER Handoff](#roger-handoff).
 - Treat raw API errors as internal: never show `err.body`, `err.message`, or status text to the user — sanitize to something like "Unable to fetch data, please try again."
