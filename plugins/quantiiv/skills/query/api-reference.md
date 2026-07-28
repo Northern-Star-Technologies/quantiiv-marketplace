@@ -23,7 +23,7 @@ client.companies.get(companyId)
 //   Falls on the company's fiscal week start day (fiscal_week_start_day, e.g.
 //   "Tuesday") — NOT necessarily a Monday. A weekly period anchor only — NOT
 //   the data-through date. For freshness use
-//   getReportingFreshnessContext().latest_safe_data_date.
+//   getReportingFreshnessContext().latest_available_data_date.
 
 // Get company's locations
 client.companies.listLocations(companyId)
@@ -38,9 +38,13 @@ client.companies.getReportingFreshnessContext(companyId, {
 // Returns:
 // {
 //   status: "ok" | "unavailable",
-//   latest_safe_data_date,       // ACTUAL data-through date — use for freshness
-//                                //   language and as max query end date
-//   latest_available_data_date, latest_common_complete_date,
+//   latest_available_data_date,  // ACTUAL data-through date (newest loaded
+//                                //   sales date across locations) — use for
+//                                //   freshness language and as max query end date
+//   latest_common_complete_date, // newest date ALL locations are complete
+//                                //   through — earlier than latest_available
+//                                //   when some locations lag; not the anchor
+//   latest_safe_data_date,       // legacy alias of latest_common_complete_date
 //   latest_complete_business_week: { start_date, end_date, fiscal_year, fiscal_week, ... },
 //   latest_complete_fiscal_period, latest_complete_calendar_month,
 //   partial_periods, location_scope_summary,
@@ -80,8 +84,8 @@ client.products.getMenuCatalog(companyId, {
 // NOTE: every `week` parameter below expects the FISCAL week start date — a
 // date falling on the company's fiscal_week_start_day (e.g. Tuesday), not
 // necessarily a Monday. For "latest" questions use the start of the current
-// IN-PROGRESS week (the week containing latest_safe_data_date) with
-// to: latest_safe_data_date, presented as week-to-date; use
+// IN-PROGRESS week (the week containing latest_available_data_date) with
+// to: latest_available_data_date, presented as week-to-date; use
 // latest_complete_business_week.start_date only when the user explicitly asks
 // for a complete week. Resolve via client.fiscalCalendar.resolveFiscalWeek().
 
