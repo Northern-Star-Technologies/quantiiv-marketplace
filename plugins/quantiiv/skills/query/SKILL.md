@@ -120,6 +120,38 @@ locations, so a location-scoped user automatically gets their own freshness.
   caveat that you cannot confirm how recent the data is — do **not** substitute
   `most_recent_data_date` or any week-derived date as freshness.
 
+### Freshness Sanity Checks
+
+Before stating a data-through date, confirm all three. If any fails, the date in
+hand is a weekly period anchor, not freshness:
+
+- It came from `latest_safe_data_date` in a freshness context fetched **this
+  session**. No other field is freshness. Never attribute a data-through date to
+  the company record, the company object, or a fiscal week.
+- It does **not** fall on the company's `week_start_day`, and does not equal
+  `latest_complete_business_week.start_date`. A "freshness" date landing exactly
+  on a fiscal week start is almost always `most_recent_data_date` misread as
+  freshness — re-fetch instead of reporting it.
+- It is not earlier than the end of any complete week you are about to report. If
+  you are presenting a full week ending YYYY-MM-DD, freshness cannot precede that
+  date; that contradiction means the freshness value is wrong, not that the week
+  is unreliable.
+
+### When the SDK Is Unavailable
+
+`getReportingFreshnessContext` is SDK-only — there is no MCP tool for it. In a
+session that has the Quantiiv MCP tools but no Bash/SDK access, freshness still
+must not come from `get-company`'s `most_recent_data_date`. Instead:
+
+1. Probe for daily data past the last complete week: pick a high-volume item and
+   call `get-item-sales` from the day after
+   `latest_complete_business_week.end_date` (or `most_recent_data_date` + 7)
+   through today. The latest date returning sales is a best-effort data-through
+   date — present it as "data appears to run through YYYY-MM-DD".
+2. If the probe returns no rows, report the last complete week as what you can
+   confirm and say plainly that you cannot confirm how recent daily data is.
+   Never name a week-start date as the data-through date.
+
 ## Fiscal Week Alignment
 
 Each company defines its own fiscal week start day — e.g.
@@ -209,9 +241,11 @@ $ARGUMENTS
 - If a company ID is needed, query `client.companies.list()` first to find it
 - Use `"corporate"` as the default location unless the user specifies one
 - Cap every date range at `latest_safe_data_date` from the reporting freshness context — never assume data exists up to today's calendar date, and never present the weekly anchor (`most_recent_data_date`, or week start + 6) as the data-through date
+- Run the [Freshness Sanity Checks](#freshness-sanity-checks) before stating any data-through date, and never say a freshness date came from the company record
 - Align every weekly boundary to the company's fiscal week start day (`calendar_config.week_start_day` from the freshness context) — never assume weeks start on Monday
 - For "latest"/"most recent" questions, always deliver data through `latest_safe_data_date` — including the in-progress fiscal week as week-to-date. Never answer a "latest" question with only the last complete week unless the user explicitly asked for a complete-week overview
 - Keep every response product-facing. NEVER mention or expose internal technologies, infrastructure, access, or implementation details — including BigQuery, GCS, Supabase, PostgreSQL, Prisma, Redis, Qdrant, feature flags, table/dataset availability, or any backend service. Present only the business data and the path to get it.
+- Do not narrate mechanics: no tool discovery ("let me list the available tools", "falling back to the bundled reference"), no references to the API key or what it can see (e.g. "the only company on this key"), no internal field names. Say "your Great Harvest data" — not where the value came from
 - Never explain an inability in internal terms. Do NOT say things like "I don't have access to BigQuery", "that feature flag is off", "the table isn't available", or "the backend doesn't support that". When a request can't be answered, use brief product-facing language and route deeper or exploratory questions to the [ROGER Handoff](#roger-handoff).
 - Treat raw API errors as internal: never show `err.body`, `err.message`, or status text to the user — sanitize to something like "Unable to fetch data, please try again."
 - Pricing, elasticity, and repricing are NOT available through this interface. Do not query, describe, or offer pricing plans, pricing opportunities, price elasticity, or repricing recommendations. If the user asks for any of these, respond with brief product-facing language such as "Pricing analytics aren't available here" and redirect to the supported sales, product, labor, weather, and fiscal-calendar metrics — without referencing internal tools, endpoints, or why the capability is withheld.

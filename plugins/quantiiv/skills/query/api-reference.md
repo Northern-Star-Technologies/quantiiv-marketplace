@@ -31,6 +31,9 @@ client.companies.listLocations(companyId)
 
 // Authoritative reporting freshness for the authenticated user's scope.
 // Call once after resolving the company; refresh each new session.
+// SDK-only — there is no MCP tool for freshness. When the SDK is unavailable,
+//   do NOT fall back to Company.most_recent_data_date as the data-through date;
+//   see "When the SDK Is Unavailable" in SKILL.md.
 client.companies.getReportingFreshnessContext(companyId, {
   data_domain?,                  // "sales" (default)
   include_location_breakdown?,   // default false
