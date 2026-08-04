@@ -289,6 +289,78 @@ client.labor.listAllShifts(companyId, { /* same params */ maxPages? })
 - Employee names, contact details, and all pay/wage fields are unavailable by
   design. `clockIn`/`clockOut` are local store time with no timezone offset.
 
+## Location Reviews
+
+Public reviews left on review platforms — Google, Yelp, TripAdvisor, Facebook,
+DoorDash and others. Use for public reviews, reputation, ratings, star ratings,
+low-star feedback, owner responses, and public sentiment about locations.
+
+**These are NOT survey results, customer feedback forms, loyalty data, or Google
+Analytics.** Never answer a survey question with review data or vice versa.
+
+```js
+// One page of reviews
+client.locationReviews.search(companyId, {
+  startDate?,        // YYYY-MM-DD. Omit BOTH dates for the default 90-day window
+  endDate?,          // YYYY-MM-DD, inclusive. Window must be <= 366 days
+  location?,         // location name; display alias matched before canonical name
+  locationId?,       // exact review-side location id
+  network?,          // review platform: google, yelp, tripadvisor... (case-insensitive)
+  minRating?,        // 1-5
+  maxRating?,        // 1-5 — use 2 for low-rating feedback
+  hasOwnerAnswer?,   // false = still unanswered
+  hasReviewText?,    // true = exclude rating-only reviews
+  limit?,            // default 50, max 200
+  cursor?,
+})
+
+// Pages the whole window — prefer this for any count, average, or trend
+client.locationReviews.listAll(companyId, { /* same params */ maxPages? })
+// Returns: { data, coverage, pages, truncated }
+
+// search returns:
+// {
+//   data: [{ reviewId, remoteReviewId, locationId, locationName, locationNameAlias,
+//            network, sourceProvider, rating, reviewDate, reviewText, reviewUrl,
+//            reviewerName, language, sentiment, recommendation,
+//            ownerAnswer, ownerAnsweredAt, hasOwnerAnswer }],
+//   pageInfo: { pageSize, returned, hasNextPage, nextCursor },
+//   coverage: {
+//     reviewsEnabled, networks, sourceProviders, ratingScale: "1-5",
+//     totalInWindow, ratedReviews, unratedReviews, withReviewText,
+//     withOwnerAnswer, averageRating, isLocationScoped, scopedLocationCount,
+//     window: { startDate, endDate, defaultWindowApplied },
+//     notes: [ ... caveats for this company and window ... ]
+//   }
+// }
+```
+
+**How to use this correctly:**
+
+- **`reviewsEnabled: false` means the company does not have Location Reviews
+  enabled — it does NOT mean they have no reviews.** Say the capability isn't
+  available for them. Likewise an empty result means no reviews *in that window*,
+  not none ever.
+- **`network` is the review platform. `sourceProvider` is only the ingestion
+  vendor** (`dataforseo`, `yext`, `ovation`, `sevenrooms`, `soci`). Never
+  attribute a review to its `sourceProvider` or call these "dataforseo reviews".
+- **Do not assume Google.** Check `coverage.networks` — one chain carries nine
+  platforms at once. Only say "Google reviews" when filtered to `network: "google"`.
+- **A null `rating` is unrated, not zero**, and is excluded from
+  `coverage.averageRating`. Some platforms carry no rating at all.
+- **Many reviews are rating-only with no text**, so `coverage.withReviewText` is
+  the real denominator for any text or theme analysis — not `totalInWindow`.
+- **Omitting both dates reads only the last 90 days**, and
+  `coverage.window.defaultWindowApplied` will be true. Pass explicit dates for
+  any other period, and keep paging while `pageInfo.hasNextPage` is true before
+  computing a total, average, or trend.
+- **`isLocationScoped: true` means the caller only has some locations**, so the
+  results are not company-wide. Say so rather than presenting chain totals.
+- Read `coverage.notes` — it carries the caveats that actually apply to the
+  company and window requested.
+- Reviewer contact details and order linkage are unavailable by design. This is
+  read-only: it cannot post, edit, or delete a review or an owner response.
+
 ## Fiscal Calendar
 
 Resolve a fiscal or calendar reporting period to concrete `start_date` / `end_date`
