@@ -7,63 +7,171 @@ argument-hint: (no arguments needed)
 
 # Quantiiv Setup
 
-Configure the Quantiiv API key, fetch a temporary registry token from Quantiiv's private package registry, install the `@quantiiv-ai/sdk`, and verify the connection.
+Configure the Quantiiv API key, fetch a temporary registry token from Quantiiv's
+private package registry, install the `@quantiiv-ai/sdk`, and verify the
+connection.
 
-## Step 1: Collect API Key
+**Never ask the user to paste their API key into the conversation, and never
+put the key literal into a command you run.** The key must go from the user
+straight into storage without passing through the transcript — Step 2 gives them
+a command that does exactly that. Handling a pasted key would both expose it in
+the conversation history (forcing a rotation) and stall this flow.
 
-Prompt the user for their Quantiiv API key. Do not assume or guess this value. The API key is used both for SDK authentication and for accessing the private npm registry.
+## Step 1: Check what already exists
 
-## Step 2: Configure Environment Variable
+Run this first, every time. It decides which steps are needed and prints no
+secret values:
 
-Configure the API key in Claude Code settings by adding to `~/.claude/settings.json` under the `env` key:
-
-```json
-{
-  "env": {
-    "QUANTIIV_API_KEY": "<user-provided-key>"
-  }
-}
+```bash
+echo "key_in_env: $([ -n "${QUANTIIV_API_KEY:-}" ] && echo yes || echo no)"
+echo "key_in_settings: $([ -f "$HOME/.claude/settings.json" ] && grep -q QUANTIIV_API_KEY "$HOME/.claude/settings.json" && echo yes || echo no)"
+if [ -d "$HOME/.claude" ]; then
+  echo "settings_writable: $([ -w "$HOME/.claude" ] && echo yes || echo no)"
+else
+  echo "settings_writable: $([ -w "$HOME" ] && echo yes || echo no)"   # dir is created on first write
+fi
+echo "sdk_installed: $(NODE_PATH="$(npm root -g)" node -e "require('@quantiiv-ai/sdk')" 2>/dev/null && echo yes || echo no)"
 ```
 
-Read the existing `~/.claude/settings.json` first, merge the new env vars with any existing ones, and write back. If the file does not exist, create it with just the env block.
+Then branch:
+
+- `key_in_env: yes` → the key is already configured. Skip to **Step 3** (install)
+  or **Step 4** (verify) — do not collect a key again.
+- `key_in_settings: yes` but `key_in_env: no` → the key is saved but this session
+  started before it was written. Tell the user to restart Claude Code; meanwhile
+  Step 4's verification still works.
+- `settings_writable: no` → this environment cannot persist credentials. Go to
+  **Step 2b**.
+
+## Step 2: Save the API key (user-run, never through chat)
+
+Give the user this command to run **in their own terminal**. It prompts silently,
+writes straight into their Claude Code settings, and never echoes the key or
+places it in the conversation:
+
+```bash
+printf 'Quantiiv API key: '; read -rs QKEY; echo; QKEY="$QKEY" python3 -c '
+import json, os
+p = os.path.expanduser("~/.claude/settings.json")
+os.makedirs(os.path.dirname(p), exist_ok=True)
+try:
+    with open(p) as f: cfg = json.load(f)
+except (FileNotFoundError, ValueError):
+    cfg = {}
+cfg.setdefault("env", {})["QUANTIIV_API_KEY"] = os.environ["QKEY"]
+with open(p, "w") as f: json.dump(cfg, f, indent=2)
+print("Saved QUANTIIV_API_KEY to", p)
+' ; unset QKEY
+```
+
+It merges into any existing `settings.json` rather than overwriting, and passes
+the key via the environment (not `argv`) so it never appears in the process list.
+
+Ask the user to confirm they saw `Saved QUANTIIV_API_KEY to ...`, then continue.
+The key will not be in *this* session's environment yet — Step 3 and Step 4 read
+it back from `settings.json`, and a restart picks it up for everything after.
+
+### Step 2a: If the user would rather not run a command
+
+Have them write the key to a file themselves (in their editor, or
+`pbpaste > ~/.quantiiv-key`), tell you the path, then run:
+
+```bash
+QKEY="$(cat <path>)" python3 -c '
+import json, os
+p = os.path.expanduser("~/.claude/settings.json")
+os.makedirs(os.path.dirname(p), exist_ok=True)
+try:
+    with open(p) as f: cfg = json.load(f)
+except (FileNotFoundError, ValueError):
+    cfg = {}
+cfg.setdefault("env", {})["QUANTIIV_API_KEY"] = os.environ["QKEY"]
+with open(p, "w") as f: json.dump(cfg, f, indent=2)
+print("Saved QUANTIIV_API_KEY to", p)
+' && rm -f <path> && echo "temp key file removed"
+```
+
+Never `cat` the file to the transcript — read it only into the variable above,
+and delete it when done.
+
+### Step 2b: Environments that cannot persist credentials
+
+Some surfaces (sandboxed or scratch workspaces, ephemeral cloud sessions) have
+no durable `~/.claude/settings.json`, so a saved key would vanish. Say so plainly
+and up front — before asking for anything — and offer:
+
+1. **Recommended** — run `/quantiiv:setup` in Claude Code on their own machine
+   (desktop app or terminal), where the key persists across sessions.
+2. **Session-only** — if they just need one query now, they can export the key in
+   the shell that launches the session:
+   `export QUANTIIV_API_KEY=...` (their own terminal, not through chat). It
+   works until the session ends.
+
+Do not attempt to write `settings.json` in an environment where Step 1 reported
+`settings_writable: no`.
 
 ## Step 3: Install the SDK
 
-The SDK is hosted on Quantiiv's private npm registry. Installation requires two steps:
+The SDK is on Quantiiv's private npm registry, so installing needs a temporary
+registry token first.
 
-1. **Fetch a temporary registry token** using the API key collected in Step 1:
+1. **Fetch a registry token.** The block is delimited so repeat runs replace it
+   instead of appending duplicate registry lines to `~/.npmrc`:
 
 ```bash
-# Ensure ~/.npmrc ends with a newline before appending (prevents concatenation with existing last line)
-[ -f ~/.npmrc ] && [ -n "$(tail -c 1 ~/.npmrc)" ] && echo '' >> ~/.npmrc
-curl -s -X POST https://quantiiv-api-400709292651.us-central1.run.app/sdk/registry-token \
-  -H "Authorization: Bearer <collected-key>" | jq -r '.npmrcSnippet' >> ~/.npmrc
+QKEY="${QUANTIIV_API_KEY:-$(python3 -c '
+import json, os
+p = os.path.expanduser("~/.claude/settings.json")
+try:
+    with open(p) as f: print(json.load(f).get("env", {}).get("QUANTIIV_API_KEY", ""))
+except Exception: print("")
+')}"
+[ -z "$QKEY" ] && echo "No API key found — complete Step 2 first" && exit 1
+if [ -f ~/.npmrc ]; then
+  awk '/# >>> quantiiv sdk registry >>>/{s=1} s==0{print} /# <<< quantiiv sdk registry <<</{s=0}' \
+    ~/.npmrc > ~/.npmrc.new && mv ~/.npmrc.new ~/.npmrc
+fi
+{
+  echo '# >>> quantiiv sdk registry >>>'
+  curl -s -X POST https://quantiiv-api-400709292651.us-central1.run.app/sdk/registry-token \
+    -H "Authorization: Bearer $QKEY" | jq -r '.npmrcSnippet'
+  echo '# <<< quantiiv sdk registry <<<'
+} >> ~/.npmrc
+unset QKEY
+grep -c '' ~/.npmrc >/dev/null && echo "registry configured"
 ```
 
-2. **Install the SDK globally**:
+2. **Install globally**:
 
 ```bash
 npm install -g @quantiiv-ai/sdk
 ```
 
-3. **Verify the installation** (use `NODE_PATH` to resolve global modules):
+3. **Verify the package loads** (`NODE_PATH` resolves global modules):
 
 ```bash
 NODE_PATH="$(npm root -g)" node -e "const { QuantiivClient } = require('@quantiiv-ai/sdk'); console.log('SDK installed successfully');"
 ```
 
-If the registry token fetch fails, check that the API key is valid and not expired.
+If the token fetch fails, the API key is likely invalid or expired — have the
+user re-run Step 2 with a fresh key. Never print the token or the key while
+debugging.
 
-## Step 4: Verify Connection
+## Step 4: Verify the connection
 
-Since the env vars written to `settings.json` are not available until the next Claude Code session, pass the values directly in the verification script:
+Env vars from `settings.json` are not in the current session until it restarts,
+so read the key back into a single command's environment. This never prints it:
 
 ```bash
-QUANTIIV_API_KEY="<collected-key>" NODE_PATH="$(npm root -g)" node -e '
+QUANTIIV_API_KEY="${QUANTIIV_API_KEY:-$(python3 -c '
+import json, os
+p = os.path.expanduser("~/.claude/settings.json")
+try:
+    with open(p) as f: print(json.load(f).get("env", {}).get("QUANTIIV_API_KEY", ""))
+except Exception: print("")
+')}" NODE_PATH="$(npm root -g)" node -e '
 const { QuantiivClient } = require("@quantiiv-ai/sdk");
-const client = new QuantiivClient({
-  token: process.env.QUANTIIV_API_KEY,
-});
+const client = new QuantiivClient({ token: process.env.QUANTIIV_API_KEY });
 (async () => {
   try {
     const result = await client.companies.list({ limit: 1 });
@@ -75,34 +183,28 @@ const client = new QuantiivClient({
 '
 ```
 
-After setup completes, inform the user that the env vars will be available automatically in future Claude Code sessions. The current session requires a restart for env vars to take effect.
+On success, tell the user setup is complete and that the key loads automatically
+in future sessions — this session needs a restart for `$QUANTIIV_API_KEY` to be
+present everywhere.
 
 If verification fails:
-- Check that the API key is valid and not expired
-- Ensure no proxy or firewall is blocking the connection
+
+- The API key may be invalid or expired — re-run Step 2 with a fresh key
+- A proxy or firewall may be blocking the connection
 
 ## Updating the SDK
 
-Use this flow when the user asks to update/upgrade the SDK, or when the
-installed SDK is outdated — e.g. a documented method (such as
-`client.fiscalCalendar` or `client.companies.getReportingFreshnessContext`)
-is `undefined` at runtime.
+Use this when the user asks to update/upgrade the SDK, or when the installed SDK
+is outdated — e.g. a documented method (such as `client.fiscalCalendar` or
+`client.companies.getReportingFreshnessContext`) is `undefined` at runtime.
 
-The API key is already stored in the session as `$QUANTIIV_API_KEY`
-(configured during setup) — do **not** ask the user for it again. If the
-variable is empty (`[ -z "$QUANTIIV_API_KEY" ]`), run the full setup above
-first.
+The key is already stored — do **not** ask the user for it again. If both
+`$QUANTIIV_API_KEY` and the `settings.json` entry are empty, run the full setup
+above first.
 
-1. **Fetch a fresh registry token** — registry tokens are temporary, so the
-   one from install time has likely expired. Always refresh it before any
-   npm operation on the SDK:
-
-```bash
-# Ensure ~/.npmrc ends with a newline before appending (prevents concatenation with existing last line)
-[ -f ~/.npmrc ] && [ -n "$(tail -c 1 ~/.npmrc)" ] && echo '' >> ~/.npmrc
-curl -s -X POST https://quantiiv-api-400709292651.us-central1.run.app/sdk/registry-token \
-  -H "Authorization: Bearer $QUANTIIV_API_KEY" | jq -r '.npmrcSnippet' >> ~/.npmrc
-```
+1. **Refresh the registry token** — tokens are temporary, so the one from install
+   time has likely expired. Re-run the token step from **Step 3.1** (it replaces
+   the delimited block rather than appending).
 
 2. **Update the package**:
 
@@ -116,15 +218,24 @@ npm install -g @quantiiv-ai/sdk@latest
 NODE_PATH="$(npm root -g)" node -e "console.log('SDK version:', require('@quantiiv-ai/sdk/package.json').version)"
 ```
 
-If the token fetch returns an error, or the npm install fails with 401/403,
-the stored API key may be invalid or expired — re-run the full setup to
-collect a fresh key.
+If the token fetch errors, or npm install fails with 401/403, the stored key may
+be invalid or expired — re-run Step 2 to collect a fresh one.
 
 ## Requirements
 
-- Do not store credentials in project files or `.env` files — use Claude Code settings only
-- Never log or display the API key value to the user after configuration
-- The registry token is temporary — before any later npm install/update of the SDK, fetch a new token first (see "Updating the SDK")
-- For updates, reuse `$QUANTIIV_API_KEY` from the session environment — never re-prompt the user for a key they already configured
-- If the SDK is already installed, skip to Step 2
-- If env vars are already configured, skip to Step 4 and verify
+- NEVER ask the user to paste the API key into the conversation, and never
+  interpolate a key literal into a command. Use the user-run command in Step 2,
+  or read the value from `settings.json` into a single command's environment
+- Never log, echo, or display the key or the registry token — not even
+  partially, and not while debugging a failure
+- Do not store credentials in project files or `.env` files — Claude Code
+  settings only
+- Check Step 1 before collecting anything; if the key is already in the
+  environment or in `settings.json`, skip straight to install/verify
+- If the environment cannot persist credentials (`settings_writable: no`), say so
+  before asking for a key and route the user per Step 2b — do not half-complete
+  a setup that will be wiped
+- The registry token is temporary — refresh it before any later npm
+  install/update of the SDK (see "Updating the SDK")
+- Merge into `~/.claude/settings.json`; never overwrite it wholesale
+- If the SDK is already installed and the key is configured, skip to Step 4
