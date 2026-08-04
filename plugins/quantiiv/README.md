@@ -59,6 +59,8 @@ Just ask business questions — the analyst agent triggers automatically:
 - "Show me menu group metrics for this week"
 - "List my companies and locations"
 - "What's my labor cost by location this week?"
+- "How many unique employees worked at Kirkwood last month?"
+- "What's my turnover looking like this quarter?"
 - "How did delivery sales perform last month?"
 
 ## Components
