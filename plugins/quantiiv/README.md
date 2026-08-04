@@ -63,6 +63,8 @@ Just ask business questions — the analyst agent triggers automatically:
 - "What's my turnover looking like this quarter?"
 - "Which low-rated reviews still need a response?"
 - "What are people saying about my Kirkwood location?"
+- "How much did we spend on produce last month?"
+- "Who are my top vendors by spend this quarter?"
 - "How did delivery sales perform last month?"
 
 ## Components
