@@ -361,6 +361,103 @@ client.locationReviews.listAll(companyId, { /* same params */ maxPages? })
 - Reviewer contact details and order linkage are unavailable by design. This is
   read-only: it cannot post, edit, or delete a review or an owner response.
 
+## Ottimate — ESR Purchase / Invoice Detail
+
+Vendor invoices and purchase line items for **ESR Hospitality brands**, from the
+Ottimate (PlateIQ) feed. Use for purchasing, vendor spend, food/beverage cost,
+invoices, and GL-coded purchase analysis.
+
+**Grain is one row per invoice LINE ITEM.** There is no invoice header in the
+source, so invoice `totals` are sums of landed lines (`basis:
+"sum_of_landed_lines"`) — never present them as source invoice totals.
+
+```js
+// ALWAYS START HERE — discovery + freshness + what the feed does NOT carry
+client.ottimate.getCoverage(companyId)
+// Returns: {
+//   company, source, coverage, location_scope, locations[], recent_files[],
+//   fields[],                       // per-field provenance + null rates
+//   unsupported_fields[],           // {field, reason} — AP fields NOT in this feed
+//   excluded_sensitive_categories[], limits, warnings[]
+// }
+
+// Spend rollups — the main analytical call
+client.ottimate.getSpend(companyId, {
+  startDate,          // REQUIRED YYYY-MM-DD
+  endDate?, dateField?,
+  groupBy?,           // ["vendor"] default; also vendor_name, gl_account, location, day|week|month
+  limit?,             // default 200, max 2000
+  ...filters
+})
+
+// Invoices and lines (cursor-paginated)
+client.ottimate.listInvoices(companyId, { startDate, ..., limit?, cursor? })
+client.ottimate.listAllInvoices(companyId, { startDate, ..., maxPages? })
+client.ottimate.getInvoice(companyId, invoiceId)          // one invoice + all lines
+client.ottimate.listInvoiceLines(companyId, { startDate, ..., itemSku? })
+client.ottimate.listAllInvoiceLines(companyId, { startDate, ..., maxPages? })
+
+// Dimensions — resolve values here before filtering
+client.ottimate.listVendors(companyId, { startDate, ... })    // accounting_vendor + vendor_names[]
+client.ottimate.listAccounts(companyId, { startDate, ... })   // GL accounts
+client.ottimate.listLocations(companyId, { startDate, ... })  // ESR <-> Quantiiv crosswalk
+
+// Shared filters: location[], ottimateLocation[], vendor[], glAccount[],
+// glAccountName[], invoiceId[], invoiceNumber[], exportStatus, search
+```
+
+**The feed does NOT carry these — say so, do not return null or guess:**
+
+`payment_status` · `payment_date` · `paid` · `approval_status` · `approved` ·
+`due_date` · `terms` · `posting_date` · `cost_center` · `department` ·
+`category` · `po_number` · `subtotal` · `freight` · `discount` · `brand` ·
+`entity`
+
+Requesting one as a filter returns **400 with the source-specific reason**, not a
+silently ignored parameter. `getCoverage().unsupported_fields` lists all of them.
+
+**How to use this correctly:**
+
+- **`invoice_exported_date` means exported to the accounting system. Nothing
+  more.** It is NOT approval and NOT payment. Never call an invoice paid, unpaid,
+  approved, or overdue from this data.
+- **An empty result is not zero spend.** The feed is a rolling window with no
+  backfill — `coverage.first_invoice_date` is the earliest data that exists at
+  all. Anything before it is missing data. Use `getCoverage` to tell "no
+  purchases" from "not delivered yet".
+- **Group vendors on `accounting_vendor`, not `vendor_name`.** The printed
+  spelling fragments large vendors (US Foods is printed four ways); ~45.6% of
+  spend sits under vendors with more than one spelling. `vendor_names[]` keeps the
+  source-native spellings. Caveat: the accounting label maps differently per brand
+  in places, so **cross-brand vendor rollups are unreliable**.
+- **A null GL account is a real, material bucket** — roughly 1.5% of rows carrying
+  ~12% of spend. Report it as uncategorized; never drop it or treat it as $0.
+- **Negative `quantity` / `amount` / `total_amount` are genuine credits and
+  returns.** Do not filter them out; they belong in spend totals.
+- **Use the returned `amount`.** Do not recompute `quantity × unit_price` — they
+  disagree on ~5% of rows from pack/rounding differences.
+- **GL account is the only coding dimension.** No category taxonomy, cost center
+  or department exists, and Quantiiv applies no categorization of its own.
+- **A company IS an ESR brand.** Each brand is a physically separate dataset, so
+  scope to a brand by calling with that brand's `companyId`. There is no brand
+  filter, and `ottimate_group` is the whole org (`Ethan Stowell Restaurants`) on
+  every row.
+- **`invoice_id` is the only unique invoice key.** `invoice_number` is the
+  vendor's printed number and repeats across vendors.
+- **Everything is source-native except `meta.source.quantiiv_applied_fields`** —
+  location name/id and lineage. Distinguish these when explaining a value.
+- **Source location strings carry diacritics** (`Tavoláta - Cap Hill`) and differ
+  from canonical Quantiiv names (`Tavolata - Capitol Hill`). Never join by name —
+  use `listLocations`.
+- **`has_pos_location: false`** marks a real ESR cost centre with no POS record
+  (stadium kiosks, commissary, overhead). A location-scoped caller sees
+  `excludes_unmapped_sites: true` rather than a quietly smaller total.
+- **Keep paging while `pagination.has_more` is true** before quoting any total,
+  and replay the cursor with identical filters — a mismatched cursor is a 400.
+  With `listAll*`, `truncated: true` means the result is a lower bound.
+- **`startDate` is required** on every call. Ranges are capped at 400 days for
+  row-level reads and 800 days for aggregates.
+
 ## Fiscal Calendar
 
 Resolve a fiscal or calendar reporting period to concrete `start_date` / `end_date`

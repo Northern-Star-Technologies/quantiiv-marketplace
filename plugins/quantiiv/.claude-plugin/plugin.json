@@ -1,7 +1,7 @@
 {
   "name": "quantiiv",
-  "version": "0.7.0",
-  "description": "Query Quantiiv analytics data \u2014 sales, products, labor, reviews, weather \u2014 using the @quantiiv-ai/sdk",
+  "version": "0.8.0",
+  "description": "Query Quantiiv analytics data \u2014 sales, products, labor, reviews, purchasing, weather \u2014 using the @quantiiv-ai/sdk",
   "author": {
     "name": "Quantiiv",
     "url": "https://quantiiv.com"
@@ -21,6 +21,10 @@
     "shifts",
     "reviews",
     "ratings",
-    "reputation"
+    "reputation",
+    "ottimate",
+    "invoices",
+    "vendor-spend",
+    "purchasing"
   ]
 }

@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "quantiiv",
-      "description": "Query Quantiiv analytics data \u2014 sales, products, labor, reviews, weather \u2014 directly from Claude Code using the @quantiiv-ai/sdk",
+      "description": "Query Quantiiv analytics data \u2014 sales, products, labor, reviews, purchasing, weather \u2014 directly from Claude Code using the @quantiiv-ai/sdk",
       "category": "productivity",
       "author": {
         "name": "Quantiiv"
