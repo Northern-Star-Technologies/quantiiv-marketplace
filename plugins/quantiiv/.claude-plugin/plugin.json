@@ -1,7 +1,7 @@
 {
   "name": "quantiiv",
-  "version": "0.5.1",
-  "description": "Query Quantiiv analytics data — sales, products, labor, weather — using the @quantiiv-ai/sdk",
+  "version": "0.6.0",
+  "description": "Query Quantiiv analytics data \u2014 sales, products, labor, weather \u2014 using the @quantiiv-ai/sdk",
   "author": {
     "name": "Quantiiv",
     "url": "https://quantiiv.com"
@@ -14,6 +14,10 @@
     "restaurant",
     "retail",
     "sales",
-    "labor"
+    "labor",
+    "employees",
+    "headcount",
+    "turnover",
+    "shifts"
   ]
 }

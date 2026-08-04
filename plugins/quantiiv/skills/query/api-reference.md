@@ -181,7 +181,11 @@ client.labor.getByLocation(companyId, {
 // Returns:
 // { data: [{ location, laborCost }], summary: { totalLaborCost, locationCount } }
 
-// Labor hours + prorated cost bucketed by hour-of-day (0-23) for one location
+// Labor hours + prorated cost bucketed by hour-of-day (0-23) for one location.
+// Each shift's paid hours and paid amount are spread across 15-minute slices
+// between clock-in and clock-out, so totals reconcile with getByJob/getByDay.
+// Hours are PAID time, not clocked presence — unpaid breaks are excluded.
+// Buckets are local store hours; no timezone conversion is applied.
 client.labor.getByHour(companyId, locationName, {
   startDate: "YYYY-MM-DD",  // required
   endDate: "YYYY-MM-DD",    // required
@@ -191,8 +195,12 @@ client.labor.getByHour(companyId, locationName, {
 // {
 //   location,
 //   data: [{ hourOfDay, laborHours, laborCost }, ...24 rows],
-//   summary: { totalLaborHours, totalLaborCost, peakHour, peakHourLaborCost }
+//   summary: { totalLaborHours, totalLaborCost, peakHour, peakHourLaborCost },
+//   coverage: { totalShifts, countedShifts, openShifts, invalidShifts, missingClockIn }
 // }
+// Check coverage before drawing staffing conclusions: shifts still clocked in,
+// missing a clock-in, or with clock-out not after clock-in are excluded from
+// the hourly totals and counted there.
 
 // Daily labor hours + cost grouped by location and job title/position.
 // Use to compute sales per labor hour (SPLH) with custom excluded job-code
@@ -210,7 +218,76 @@ client.labor.getByJob(companyId, {
 //   data: [{ date, location, jobTitle, regularHours, overtimeHours, laborHours, laborCost, entryCount }],
 //   summary: { totalLaborHours, totalRegularHours, totalOvertimeHours, totalLaborCost, totalDays, locationCount, jobTitleCount }
 // }
+// WARNING: entryCount is a count of shift rows, NOT unique employees. One
+// employee working two shifts is indistinguishable from two employees working
+// one shift each. Never report entryCount as a headcount — use getShifts below.
 ```
+
+## Employee / Shift-Level Labor
+
+Individual clock-in/clock-out rows with a pseudonymous `employeeId`. Use this for
+unique headcount and turnover proxies — the aggregate endpoints above cannot
+express either.
+
+```js
+// One page of shift rows
+client.labor.getShifts(companyId, {
+  startDate: "YYYY-MM-DD",  // required
+  endDate: "YYYY-MM-DD",    // required — range must be 186 days or fewer
+  location?,                 // optional exact location filter
+  jobTitle?,                 // optional exact job title / position filter
+  loadSource?,
+  employeeId?,               // optional — fetch one worker's shifts
+  limit?,                    // default 500, max 1000
+  cursor?,                   // from a previous pageInfo.nextCursor
+})
+
+// Pages through the entire range — prefer this for any aggregate
+client.labor.listAllShifts(companyId, { /* same params */ maxPages? })
+// Returns: { data, coverage, pages, truncated }
+
+// getShifts returns:
+// {
+//   data: [{ employeeId, businessDate, location, jobTitle, clockIn, clockOut,
+//            regularHours, overtimeHours, totalHours, loadSource }],
+//   pageInfo: { pageSize, returned, hasNextPage, nextCursor },
+//   coverage: {
+//     employeeIdScope: "company" | "location" | "unknown",
+//     employeeIdAvailable, timestampSemantics: "local-store-time",
+//     totalShiftRows,
+//     sources: [{ loadSource, loadSourceFamily, employeeIdScope, shiftRows,
+//                 rowsWithEmployeeId, distinctEmployeeIds, openShifts,
+//                 missingClockIn, earliestBusinessDate, latestBusinessDate }],
+//     notes: [ ... caveats for this company and range ... ]
+//   }
+// }
+```
+
+**How to use this correctly:**
+
+- Rows are punch segments, **not** unique employees and not necessarily shifts —
+  one shift can produce several segments after a break or job change. Count
+  `new Set(data.map(r => r.employeeId)).size` for headcount, never `data.length`.
+- **Check `coverage.employeeIdScope` before aggregating across locations.** When
+  it is `"location"` (all Toast customers) or `"unknown"`, the identifier is only
+  stable within one location: the same person working two stores appears as two
+  identifiers, so a chain-wide unique count overstates headcount and a transfer
+  is indistinguishable from a separation plus a new hire. Report per location and
+  say so. Only `"company"` permits chain-wide dedup.
+- Keep paging while `pageInfo.hasNextPage` is true, or headcount is undercounted.
+  With `listAllShifts`, treat `truncated: true` as an incomplete read.
+- A first observed shift is a **hire-date proxy**, not a hire date. A long gap
+  with no shifts is a **separation proxy**, not a confirmed termination — the
+  worker may be on leave, seasonal, or recorded under another identifier.
+- Voluntary vs involuntary turnover **cannot** be derived from clock data, and
+  neither can rehires as distinct from continuing employment.
+- State the assumptions behind any figure: the inactivity threshold that counts
+  as a separation, rehire handling, how multi-location workers are attributed,
+  and the denominator used. If the user did not specify them, say which you chose.
+- Present results as estimates from clock data, not authoritative HR records.
+  Read `coverage.notes` — it carries the caveats for the exact range requested.
+- Employee names, contact details, and all pay/wage fields are unavailable by
+  design. `clockIn`/`clockOut` are local store time with no timezone offset.
 
 ## Fiscal Calendar
 
